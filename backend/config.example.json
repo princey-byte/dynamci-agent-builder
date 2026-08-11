@@ -1,0 +1,28 @@
+{
+  "server": {
+    "port": "8080",
+    "database_url": "postgres://postgres:postgres@localhost:5432/agentic_platform?sslmode=disable"
+  },
+  "llm": {
+    "default_provider": "openai",
+    "openai": {
+      "api_key": ""
+    },
+    "azure_openai": {
+      "api_key": "",
+      "endpoint": "",
+      "api_version": "2024-02-15-preview",
+      "deployments": {
+        "gpt-4o": "gpt-4o-deployment",
+        "gpt-4": "gpt-4-deployment",
+        "gpt-3.5-turbo": "gpt-35-turbo-deployment"
+      }
+    },
+    "anthropic": {
+      "api_key": ""
+    },
+    "gemini": {
+      "api_key": ""
+    }
+  }
+}
