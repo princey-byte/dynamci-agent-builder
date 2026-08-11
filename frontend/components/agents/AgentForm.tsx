@@ -262,35 +262,143 @@ export function AgentForm({ initialData, isEdit = false }: AgentFormProps) {
         )}
       </div>
 
-      {/* MCP Tools Attachment */}
-      <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-slate-200 border-b border-[#1e293b] pb-2">
-          Attach Model Context Protocol (MCP) Tools
-        </h3>
+      {/* MCP Tools Attachment (Grouped Server-wise with Category & Universal Select All) */}
+      <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-6 space-y-5">
+        <div className="flex items-center justify-between border-b border-[#1e293b] pb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-200">
+              Attach Model Context Protocol (MCP) Tools
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Select specific capabilities to grant this agent. Categorized by parent MCP Server.
+            </p>
+          </div>
+
+          {availableTools.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-amber-400 font-mono font-semibold bg-amber-950/50 px-2 py-1 rounded border border-amber-800/60">
+                {selectedToolIDs.length} / {availableTools.length} Selected
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const allSelected = availableTools.every((t) => selectedToolIDs.includes(t.id));
+                  if (allSelected) {
+                    setSelectedToolIDs([]);
+                  } else {
+                    setSelectedToolIDs(availableTools.map((t) => t.id));
+                  }
+                }}
+                className="px-3 py-1.5 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 text-xs font-semibold rounded-lg border border-indigo-700/60 transition-all"
+              >
+                {availableTools.every((t) => selectedToolIDs.includes(t.id))
+                  ? 'Deselect All Across Servers'
+                  : 'Select All Tools (All Servers)'}
+              </button>
+            </div>
+          )}
+        </div>
+
         {availableTools.length === 0 ? (
           <p className="text-xs text-slate-500 italic">No MCP tools registered. Register tools in MCP Registry first.</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {availableTools.map((tool) => {
-              const isSelected = selectedToolIDs.includes(tool.id);
-              return (
-                <button
-                  type="button"
-                  key={tool.id}
-                  onClick={() => toggleTool(tool.id)}
-                  className={`p-3 rounded-lg border text-left flex justify-between items-center transition-all ${
-                    isSelected
-                      ? 'bg-amber-950/40 border-amber-500/60 text-amber-300'
-                      : 'bg-[#090d16] border-[#1e293b] text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  <div>
-                    <div className="text-xs font-medium truncate">{tool.name}</div>
-                    <div className="text-[10px] text-slate-500 font-mono truncate">{tool.transport_type}</div>
+          <div className="space-y-5">
+            {(() => {
+              // Group tools by parent server name or ID
+              const grouped: Record<string, { serverName: string; serverUrl: string; tools: MCPTool[] }> = {};
+
+              availableTools.forEach((tool) => {
+                const groupKey = tool.server?.name || (tool.server_id ? `Server (${tool.server_id.slice(0, 8)})` : 'Standalone Custom Tools');
+                const groupUrl = tool.server?.server_url || tool.server_url || '';
+
+                if (!grouped[groupKey]) {
+                  grouped[groupKey] = {
+                    serverName: groupKey,
+                    serverUrl: groupUrl,
+                    tools: [],
+                  };
+                }
+                grouped[groupKey].tools.push(tool);
+              });
+
+              return Object.values(grouped).map((group, groupIdx) => {
+                const categoryTools = group.tools;
+                const categorySelectedCount = categoryTools.filter((t) => selectedToolIDs.includes(t.id)).length;
+                const isCategoryAllSelected = categoryTools.length > 0 && categoryTools.every((t) => selectedToolIDs.includes(t.id));
+
+                const toggleCategory = () => {
+                  const categoryIds = categoryTools.map((t) => t.id);
+                  if (isCategoryAllSelected) {
+                    setSelectedToolIDs((prev) => prev.filter((id) => !categoryIds.includes(id)));
+                  } else {
+                    setSelectedToolIDs((prev) => Array.from(new Set([...prev, ...categoryIds])));
+                  }
+                };
+
+                return (
+                  <div key={groupIdx} className="bg-[#090d16] border border-[#1e293b] rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-[#1e293b]/80 pb-2.5">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                          {group.serverName}
+                        </h4>
+                        {group.serverUrl && (
+                          <span className="text-[10px] text-slate-500 font-mono truncate max-w-[200px]">
+                            ({group.serverUrl})
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] text-slate-400 font-mono bg-slate-800 px-2 py-0.5 rounded">
+                          {categorySelectedCount} / {categoryTools.length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={toggleCategory}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium rounded border border-[#1e293b] transition-colors"
+                        >
+                          {isCategoryAllSelected ? 'Deselect Category' : 'Select All in Category'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {categoryTools.map((tool) => {
+                        const isSelected = selectedToolIDs.includes(tool.id);
+                        return (
+                          <button
+                            type="button"
+                            key={tool.id}
+                            onClick={() => toggleTool(tool.id)}
+                            className={`p-3 rounded-lg border text-left flex justify-between items-start transition-all ${
+                              isSelected
+                                ? 'bg-amber-950/40 border-amber-500/60 text-amber-300 shadow-sm shadow-amber-500/10'
+                                : 'bg-[#111726] border-[#1e293b] text-slate-400 hover:border-slate-700 hover:text-slate-300'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-mono font-semibold truncate flex items-center justify-between">
+                                <span>{tool.name}</span>
+                                {isSelected && (
+                                  <span className="text-[9px] uppercase font-bold text-amber-400 bg-amber-950 px-1 py-0.2 rounded border border-amber-800">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                                {tool.description || 'No description provided'}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </button>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         )}
       </div>

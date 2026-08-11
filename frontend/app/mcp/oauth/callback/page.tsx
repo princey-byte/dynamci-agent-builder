@@ -7,8 +7,12 @@ import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 export default function MCPOAuthCallbackPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Exchanging authorization code and discovering tools...');
+  const exchangedRef = React.useRef(false);
 
   useEffect(() => {
+    if (exchangedRef.current) return;
+    exchangedRef.current = true;
+
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const errorParam = urlParams.get('error');
@@ -20,8 +24,8 @@ export default function MCPOAuthCallbackPage() {
     }
 
     if (!code) {
-      // Fallback mock code for manual testing or demonstration
-      handleExchange('mock_oauth_code_success');
+      setStatus('error');
+      setMessage('No authorization code returned from OAuth provider.');
       return;
     }
 
@@ -30,11 +34,11 @@ export default function MCPOAuthCallbackPage() {
 
   const handleExchange = async (code: string) => {
     try {
-      const serverUrl = sessionStorage.getItem('mcp_oauth_server_url') || 'https://api.githubcopilot.com/mcp/';
-      const tokenUrl = sessionStorage.getItem('mcp_oauth_token_url') || '';
-      const codeVerifier = sessionStorage.getItem('mcp_oauth_code_verifier') || 'mock_verifier';
-      const clientId = sessionStorage.getItem('mcp_oauth_client_id') || '';
-      const clientSecret = sessionStorage.getItem('mcp_oauth_client_secret') || '';
+      const serverUrl = localStorage.getItem('mcp_oauth_server_url') || 'https://api.githubcopilot.com/mcp/';
+      const tokenUrl = localStorage.getItem('mcp_oauth_token_url') || '';
+      const codeVerifier = localStorage.getItem('mcp_oauth_code_verifier') || '';
+      const clientId = localStorage.getItem('mcp_oauth_client_id') || '';
+      const clientSecret = localStorage.getItem('mcp_oauth_client_secret') || '';
       const redirectUri = window.location.origin + window.location.pathname;
 
       const res = await api.callbackMCPOAuth({

@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -131,41 +132,60 @@ func ExchangeOAuthToken(ctx context.Context, req models.OAuthCallbackRequest) (*
 		}
 	}
 
-	form := url.Values{}
-	form.Set("grant_type", "authorization_code")
-	form.Set("code", req.Code)
-	form.Set("redirect_uri", req.RedirectURI)
-	form.Set("code_verifier", req.CodeVerifier)
-	if req.ClientID != "" {
-		form.Set("client_id", req.ClientID)
-	}
-	if req.ClientSecret != "" {
-		form.Set("client_secret", req.ClientSecret)
+	var httpReq *http.Request
+	var err error
+
+	if strings.Contains(tokenURL, "atlassian") || strings.Contains(req.ServerURL, "atlassian") {
+		// Atlassian strictly requires application/json body
+		jsonPayload := map[string]string{
+			"grant_type":    "authorization_code",
+			"client_id":     req.ClientID,
+			"client_secret": req.ClientSecret,
+			"code":          req.Code,
+			"redirect_uri":  req.RedirectURI,
+		}
+		if req.CodeVerifier != "" {
+			jsonPayload["code_verifier"] = req.CodeVerifier
+		}
+		jsonBytes, _ := json.Marshal(jsonPayload)
+		httpReq, err = http.NewRequestWithContext(ctx, "POST", tokenURL, bytes.NewBuffer(jsonBytes))
+		if err != nil {
+			return nil, err
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+	} else {
+		// Form-encoded format (GitHub / Notion)
+		form := url.Values{}
+		form.Set("grant_type", "authorization_code")
+		form.Set("code", req.Code)
+		form.Set("redirect_uri", req.RedirectURI)
+		form.Set("code_verifier", req.CodeVerifier)
+		if req.ClientID != "" {
+			form.Set("client_id", req.ClientID)
+		}
+		if req.ClientSecret != "" {
+			form.Set("client_secret", req.ClientSecret)
+		}
+		httpReq, err = http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(form.Encode()))
+		if err != nil {
+			return nil, err
+		}
+		httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(form.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("User-Agent", "AgenticPlatform/1.0")
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		// Fallback mock token for testing if remote OAuth token endpoint is unreachable
-		return &models.OAuthTokens{
-			AccessToken:  fmt.Sprintf("mock_oauth_access_token_%d", time.Now().Unix()),
-			TokenType:    "Bearer",
-			ExpiresAt:    time.Now().Add(24 * time.Hour),
-			Scope:        "read,write",
-		}, nil
+		return nil, fmt.Errorf("failed to reach OAuth token endpoint (%s): %w", tokenURL, err)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read OAuth token response: %w", err)
 	}
 
 	var res oauthTokenResponse
@@ -178,7 +198,7 @@ func ExchangeOAuthToken(ctx context.Context, req models.OAuthCallbackRequest) (*
 			res.Scope = parsedQuery.Get("scope")
 			res.RefreshToken = parsedQuery.Get("refresh_token")
 		} else {
-			return nil, fmt.Errorf("failed to parse token response: %s", string(bodyBytes))
+			return nil, fmt.Errorf("failed to parse OAuth token response: %s", string(bodyBytes))
 		}
 	}
 
@@ -187,7 +207,7 @@ func ExchangeOAuthToken(ctx context.Context, req models.OAuthCallbackRequest) (*
 	}
 
 	if res.AccessToken == "" {
-		res.AccessToken = fmt.Sprintf("oauth_access_token_%d", time.Now().Unix())
+		return nil, fmt.Errorf("OAuth server returned empty access token. Response: %s", string(bodyBytes))
 	}
 
 	expiresAt := time.Time{}
