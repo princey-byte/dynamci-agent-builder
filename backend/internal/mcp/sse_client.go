@@ -34,6 +34,7 @@ func NewSSEMCPClient(serverURL string, toolName string, schema json.RawMessage, 
 func (c *SSEMCPClient) applyHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("User-Agent", "AgenticPlatform/1.0")
 
 	switch c.AuthType {
 	case models.AuthTypeBearer:
@@ -53,6 +54,15 @@ func (c *SSEMCPClient) applyHeaders(req *http.Request) {
 	case models.AuthTypeCustomHeaders:
 		for k, v := range c.AuthConfig.CustomHeaders {
 			req.Header.Set(k, v)
+		}
+	}
+
+	// Fallback Authorization header if OAuth or Bearer token is present
+	if req.Header.Get("Authorization") == "" {
+		if c.AuthConfig.OAuth != nil && c.AuthConfig.OAuth.AccessToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.AuthConfig.OAuth.AccessToken))
+		} else if c.AuthConfig.BearerToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.AuthConfig.BearerToken))
 		}
 	}
 
