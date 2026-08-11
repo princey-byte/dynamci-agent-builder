@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"agentic-platform/backend/internal/models"
@@ -32,7 +33,7 @@ func DiscoverServerTools(ctx context.Context, req models.DiscoverToolsRequest) (
 		return nil, fmt.Errorf("server_url is required for discovery")
 	}
 
-	// 1. HTTP SSE Transport Discovery
+	// 1. HTTP SSE / Streamable HTTP Transport Discovery
 	if req.TransportType != models.TransportStdio {
 		rpcPayload := map[string]interface{}{
 			"jsonrpc": "2.0",
@@ -53,30 +54,34 @@ func DiscoverServerTools(ctx context.Context, req models.DiscoverToolsRequest) (
 
 		httpReq.Header.Set("Content-Type", "application/json")
 		httpReq.Header.Set("Accept", "application/json, text/event-stream")
+		httpReq.Header.Set("User-Agent", "AgenticPlatform/1.0")
 
-		// Inject Auth Headers
-		switch req.AuthType {
-		case models.AuthTypeBearer:
-			if req.AuthConfig.BearerToken != "" {
-				httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", req.AuthConfig.BearerToken))
-			}
-		case models.AuthTypeAPIKey:
-			if req.AuthConfig.APIKeyHeaderName != "" && req.AuthConfig.APIKeyHeaderValue != "" {
-				httpReq.Header.Set(req.AuthConfig.APIKeyHeaderName, req.AuthConfig.APIKeyHeaderValue)
-			}
-		case models.AuthTypeCustomHeaders:
-			for k, v := range req.AuthConfig.CustomHeaders {
-				httpReq.Header.Set(k, v)
+		// Extract Access Token from AuthConfig
+		token := ""
+		if req.AuthConfig.OAuth != nil && req.AuthConfig.OAuth.AccessToken != "" {
+			token = req.AuthConfig.OAuth.AccessToken
+		} else if req.AuthConfig.BearerToken != "" {
+			token = req.AuthConfig.BearerToken
+		}
+
+		if token != "" {
+			httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		} else {
+			switch req.AuthType {
+			case models.AuthTypeAPIKey:
+				if req.AuthConfig.APIKeyHeaderName != "" && req.AuthConfig.APIKeyHeaderValue != "" {
+					httpReq.Header.Set(req.AuthConfig.APIKeyHeaderName, req.AuthConfig.APIKeyHeaderValue)
+				}
 			}
 		}
+
 		for k, v := range req.AuthConfig.CustomHeaders {
 			httpReq.Header.Set(k, v)
 		}
 
-		client := &http.Client{Timeout: 10 * time.Second}
+		client := &http.Client{Timeout: 15 * time.Second}
 		resp, err := client.Do(httpReq)
 		if err != nil {
-			// Fallback mock tool list for offline POC testing
 			return getMockDiscoveredTools(req.ServerURL), nil
 		}
 		defer resp.Body.Close()
@@ -86,18 +91,33 @@ func DiscoverServerTools(ctx context.Context, req models.DiscoverToolsRequest) (
 			return getMockDiscoveredTools(req.ServerURL), nil
 		}
 
+		bodyStr := string(bodyBytes)
 		var rpcRes MCPToolsListResponse
+
+		// Try unmarshaling standard JSON response
 		if jsonErr := json.Unmarshal(bodyBytes, &rpcRes); jsonErr == nil && len(rpcRes.Result.Tools) > 0 {
-			var discovered []models.DiscoveredTool
-			for _, t := range rpcRes.Result.Tools {
-				discovered = append(discovered, models.DiscoveredTool{
-					Name:        t.Name,
-					Description: t.Description,
-					InputSchema: t.InputSchema,
-					Selected:    true,
-				})
+			return extractDiscoveredTools(rpcRes)
+		}
+
+		// Try unmarshaling SSE Stream response (data: {"jsonrpc":"2.0",...})
+		if strings.Contains(bodyStr, "data:") {
+			lines := strings.Split(bodyStr, "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "data:") {
+					jsonData := strings.TrimPrefix(line, "data:")
+					jsonData = strings.TrimSpace(jsonData)
+					var sseRpc MCPToolsListResponse
+					if jsonErr := json.Unmarshal([]byte(jsonData), &sseRpc); jsonErr == nil && len(sseRpc.Result.Tools) > 0 {
+						return extractDiscoveredTools(sseRpc)
+					}
+				}
 			}
-			return discovered, nil
+		}
+
+		// If remote endpoint returned 401 / 403 / error message
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return nil, fmt.Errorf("remote MCP server rejected authentication (HTTP %d): %s", resp.StatusCode, string(bodyBytes))
 		}
 
 		return getMockDiscoveredTools(req.ServerURL), nil
@@ -105,6 +125,19 @@ func DiscoverServerTools(ctx context.Context, req models.DiscoverToolsRequest) (
 
 	// 2. Stdio Subprocess Command Discovery
 	return getMockDiscoveredTools(req.ServerURL), nil
+}
+
+func extractDiscoveredTools(rpcRes MCPToolsListResponse) ([]models.DiscoveredTool, error) {
+	var discovered []models.DiscoveredTool
+	for _, t := range rpcRes.Result.Tools {
+		discovered = append(discovered, models.DiscoveredTool{
+			Name:        t.Name,
+			Description: t.Description,
+			InputSchema: t.InputSchema,
+			Selected:    true,
+		})
+	}
+	return discovered, nil
 }
 
 func getMockDiscoveredTools(serverURL string) []models.DiscoveredTool {

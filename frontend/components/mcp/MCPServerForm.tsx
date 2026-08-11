@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
-import { TransportType, AuthType, AuthConfig, DiscoveredTool } from '../../lib/types';
-import { ArrowLeft, Save, Wrench, RefreshCw, CheckCircle2, AlertCircle, Plus, Trash2, Key, Lock, Globe, Terminal } from 'lucide-react';
+import { TransportType, AuthType, AuthConfig, DiscoveredTool, OAuthTokens } from '../../lib/types';
+import { ArrowLeft, Save, Wrench, RefreshCw, CheckCircle2, AlertCircle, Plus, Trash2, Lock, ExternalLink } from 'lucide-react';
 
 export function MCPServerForm() {
   const router = useRouter();
@@ -31,6 +31,15 @@ export function MCPServerForm() {
     { key: '', value: '' },
   ]);
 
+  // OAuth 2.1 State
+  const [oauthAuthorizeUrl, setOauthAuthorizeUrl] = useState('https://github.com/login/oauth/authorize');
+  const [oauthTokenUrl, setOauthTokenUrl] = useState('https://github.com/login/oauth/access_token');
+  const [oauthClientId, setOauthClientId] = useState('');
+  const [oauthClientSecret, setOauthClientSecret] = useState('');
+  const [oauthScopes, setOauthScopes] = useState('repo,read:user');
+  const [oauthTokens, setOauthTokens] = useState<OAuthTokens | null>(null);
+  const [oauthAuthenticating, setOauthAuthenticating] = useState(false);
+
   // Step 3: Discovery State
   const [discovering, setDiscovering] = useState(false);
   const [discoveredTools, setDiscoveredTools] = useState<DiscoveredTool[]>([]);
@@ -39,7 +48,46 @@ export function MCPServerForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Helper to compile AuthConfig object
+  // Listen for OAuth Pop-up message completion
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'MCP_OAUTH_SUCCESS') {
+        const tokens: OAuthTokens = event.data.tokens;
+        const tools: DiscoveredTool[] = event.data.tools || [];
+        setOauthTokens(tokens);
+        setDiscoveredTools(tools);
+        setDiscoverySuccess(true);
+        setOauthAuthenticating(false);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const selectPreset = (provider: 'github' | 'notion' | 'atlassian') => {
+    setAuthType('oauth2');
+    setTransportType('sse');
+    if (provider === 'github') {
+      setName('GitHub Enterprise MCP Server');
+      setServerUrl('https://api.githubcopilot.com/mcp/');
+      setOauthAuthorizeUrl('https://github.com/login/oauth/authorize');
+      setOauthTokenUrl('https://github.com/login/oauth/access_token');
+      setOauthScopes('repo,read:user');
+    } else if (provider === 'notion') {
+      setName('Notion Cloud MCP Server');
+      setServerUrl('https://mcp.notion.com/mcp');
+      setOauthAuthorizeUrl('https://api.notion.com/v1/oauth/authorize');
+      setOauthTokenUrl('https://api.notion.com/v1/oauth/token');
+      setOauthScopes('read:notion');
+    } else if (provider === 'atlassian') {
+      setName('Atlassian Rovo MCP Server');
+      setServerUrl('https://mcp.atlassian.com/v1/mcp');
+      setOauthAuthorizeUrl('https://auth.atlassian.com/authorize');
+      setOauthTokenUrl('https://auth.atlassian.com/oauth/token');
+      setOauthScopes('read:jira-work read:confluence-content.summary offline_access');
+    }
+  };
+
   const buildAuthConfig = (): AuthConfig => {
     const config: AuthConfig = {};
 
@@ -64,9 +112,60 @@ export function MCPServerForm() {
         }
       });
       config.env_vars = envObj;
+    } else if (authType === 'oauth2' && oauthTokens) {
+      config.oauth = oauthTokens;
     }
 
     return config;
+  };
+
+  const handleLaunchOAuthPopup = async () => {
+    if (!serverUrl.trim()) {
+      setError('Please enter a Server URL before initiating OAuth authorization.');
+      return;
+    }
+
+    if (authType === 'oauth2' && (serverUrl.toLowerCase().includes('github') || serverUrl.toLowerCase().includes('notion') || serverUrl.toLowerCase().includes('atlassian')) && !oauthClientId.trim()) {
+      setError('OAuth authorization requires a Client ID from your Developer Settings. Please enter your OAuth Client ID below (or switch to "Bearer Token" or "Custom Headers" to use an API/Personal Token).');
+      return;
+    }
+
+    setOauthAuthenticating(true);
+    setError(null);
+
+    try {
+      const redirectUri = `${window.location.origin}/mcp/oauth/callback`;
+
+      const initRes = await api.initMCPOAuth({
+        server_url: serverUrl,
+        authorize_url: oauthAuthorizeUrl,
+        client_id: oauthClientId,
+        scopes: oauthScopes,
+        redirect_uri: redirectUri,
+      });
+
+      // Save parameters in sessionStorage for callback popup
+      sessionStorage.setItem('mcp_oauth_server_url', serverUrl);
+      sessionStorage.setItem('mcp_oauth_token_url', oauthTokenUrl);
+      sessionStorage.setItem('mcp_oauth_code_verifier', initRes.code_verifier);
+      sessionStorage.setItem('mcp_oauth_client_id', oauthClientId);
+      sessionStorage.setItem('mcp_oauth_client_secret', oauthClientSecret);
+
+      // Launch pop-up window
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.innerWidth - width) / 2;
+      const top = window.screenY + (window.innerHeight - height) / 2;
+
+      window.open(
+        initRes.authorization_url,
+        'mcp_oauth_popup',
+        `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+      );
+    } catch (err: any) {
+      setError(err.message || 'Failed to initiate OAuth authorization flow.');
+      setOauthAuthenticating(false);
+    }
   };
 
   const handleDiscover = async () => {
@@ -117,6 +216,9 @@ export function MCPServerForm() {
         transport_type: transportType,
         auth_type: authType,
         auth_config: buildAuthConfig(),
+        oauth_client_id: oauthClientId,
+        oauth_client_secret: oauthClientSecret,
+        oauth_scopes: oauthScopes,
         import_tools: selectedTools,
       });
 
@@ -147,6 +249,37 @@ export function MCPServerForm() {
           <span>{error}</span>
         </div>
       )}
+
+      {/* Quick Presets Banner */}
+      <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">Quick Presets</h4>
+          <p className="text-[11px] text-slate-400">Pre-configure endpoints & OAuth settings for cloud MCP servers</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => selectPreset('github')}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-[#1e293b] transition-colors"
+          >
+            GitHub MCP
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPreset('notion')}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-[#1e293b] transition-colors"
+          >
+            Notion MCP
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPreset('atlassian')}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-[#1e293b] transition-colors"
+          >
+            Atlassian Rovo
+          </button>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section 1: Server Info & Transport */}
@@ -229,7 +362,7 @@ export function MCPServerForm() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              Authentication Type
+              Authentication Method
             </label>
             <select
               value={authType}
@@ -239,6 +372,7 @@ export function MCPServerForm() {
               <option value="none">No Authentication (Public / Local)</option>
               {transportType === 'sse' && (
                 <>
+                  <option value="oauth2">OAuth 2.1 Pop-up Authorization (GitHub, Notion, Atlassian)</option>
                   <option value="bearer">Bearer Token (Authorization: Bearer &lt;token&gt;)</option>
                   <option value="api_key">API Key Header (e.g. X-API-Key: &lt;key&gt;)</option>
                   <option value="custom_headers">Custom HTTP Headers</option>
@@ -249,6 +383,111 @@ export function MCPServerForm() {
               )}
             </select>
           </div>
+
+          {/* OAuth 2.1 Form */}
+          {authType === 'oauth2' && (
+            <div className="space-y-4 bg-[#090d16] p-4 rounded-xl border border-[#1e293b]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-indigo-400 flex items-center space-x-1.5">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>OAuth 2.1 PKCE Pop-up Flow Settings</span>
+                </span>
+                {oauthTokens && (
+                  <span className="px-2 py-0.5 bg-emerald-950 text-emerald-400 text-[10px] font-mono border border-emerald-800 rounded">
+                    AUTHORIZED
+                  </span>
+                )}
+              </div>
+
+              <div className="p-3 bg-indigo-950/40 border border-indigo-800/60 rounded-lg text-xs text-indigo-200 space-y-1">
+                <div className="font-semibold text-indigo-300">How Cloud OAuth Authorization Works (GitHub / Notion / Atlassian):</div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Cloud OAuth requires an <strong>OAuth Client ID</strong> from your Developer Console (<code className="text-amber-300 font-mono">github.com/settings/developers</code>, <code className="text-amber-300 font-mono">notion.so/my-integrations</code>, or <code className="text-amber-300 font-mono">developer.atlassian.com/console/myapps</code>). Set Callback URL to: <code className="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">http://localhost:3000/mcp/oauth/callback</code>.
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  <em>Tip: If you don't have a Public OAuth App ID, switch <strong>Authentication Method</strong> above to <strong>"Bearer Token"</strong> or <strong>"Custom HTTP Headers"</strong> and paste a Personal Access Token / API Token (<code className="font-mono">ghp_...</code>, <code className="font-mono">ntn_...</code>, or <code className="font-mono">Basic base64(email:token)</code>) directly!</em>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Authorization URL
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://github.com/login/oauth/authorize"
+                    value={oauthAuthorizeUrl}
+                    onChange={(e) => setOauthAuthorizeUrl(e.target.value)}
+                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Token Exchange URL
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://github.com/login/oauth/access_token"
+                    value={oauthTokenUrl}
+                    onChange={(e) => setOauthTokenUrl(e.target.value)}
+                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Client ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ov23li..."
+                    value={oauthClientId}
+                    onChange={(e) => setOauthClientId(e.target.value)}
+                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Client Secret (GitHub Apps)
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="e.g. 8f9a2b3c..."
+                    value={oauthClientSecret}
+                    onChange={(e) => setOauthClientSecret(e.target.value)}
+                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Scopes
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="repo,read:user"
+                    value={oauthScopes}
+                    onChange={(e) => setOauthScopes(e.target.value)}
+                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleLaunchOAuthPopup}
+                  disabled={oauthAuthenticating}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium text-xs rounded-lg shadow-md transition-all"
+                >
+                  <ExternalLink className={`w-4 h-4 ${oauthAuthenticating ? 'animate-spin' : ''}`} />
+                  <span>{oauthAuthenticating ? 'Waiting for Pop-up Consent...' : 'Launch OAuth 2.1 Pop-up Window'}</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Bearer Token Form */}
           {authType === 'bearer' && (

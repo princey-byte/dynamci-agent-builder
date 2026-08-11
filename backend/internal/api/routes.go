@@ -69,6 +69,8 @@ func SetupRouter(
 		v1.GET("/mcp/servers/:id", mcpServerHandler.GetServer)
 		v1.DELETE("/mcp/servers/:id", mcpServerHandler.DeleteServer)
 		v1.POST("/mcp/servers/discover", mcpServerHandler.DiscoverTools)
+		v1.POST("/mcp/oauth/init", mcpServerHandler.InitOAuth)
+		v1.POST("/mcp/oauth/callback", mcpServerHandler.CallbackOAuth)
 
 		// Legacy MCP Tools
 		v1.POST("/mcp/tools", mcpToolHandler.RegisterTool)

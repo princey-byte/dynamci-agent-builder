@@ -15,6 +15,8 @@ export function MCPServerCard({ server, onDelete }: MCPServerCardProps) {
 
   const getAuthBadge = () => {
     switch (server.auth_type) {
+      case 'oauth2':
+        return <Badge variant="amber">OAUTH 2.1</Badge>;
       case 'bearer':
         return <Badge variant="amber">BEARER TOKEN</Badge>;
       case 'api_key':

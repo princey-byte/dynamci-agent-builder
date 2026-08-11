@@ -1,7 +1,15 @@
 export type RoleType = 'supervisor' | 'worker' | 'evaluator';
 export type FileType = 'markdown' | 'text';
 export type TransportType = 'sse' | 'stdio';
-export type AuthType = 'none' | 'bearer' | 'api_key' | 'custom_headers' | 'env_vars';
+export type AuthType = 'none' | 'bearer' | 'api_key' | 'custom_headers' | 'env_vars' | 'oauth2';
+
+export interface OAuthTokens {
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_at?: string;
+  scope?: string;
+}
 
 export interface AuthConfig {
   bearer_token?: string;
@@ -9,6 +17,7 @@ export interface AuthConfig {
   api_key_header_value?: string;
   custom_headers?: Record<string, string>;
   env_vars?: Record<string, string>;
+  oauth?: OAuthTokens;
 }
 
 export interface Skill {
@@ -39,6 +48,10 @@ export interface MCPServer {
   transport_type: TransportType;
   auth_type: AuthType;
   auth_config: AuthConfig;
+  oauth_client_id?: string;
+  oauth_client_secret?: string;
+  oauth_scopes?: string;
+  oauth_tokens?: OAuthTokens;
   status: string;
   created_at: string;
   updated_at: string;
@@ -57,6 +70,30 @@ export interface DiscoverToolsRequest {
   transport_type: TransportType;
   auth_type: AuthType;
   auth_config: AuthConfig;
+}
+
+export interface OAuthInitRequest {
+  server_url: string;
+  authorize_url?: string;
+  client_id?: string;
+  scopes?: string;
+  redirect_uri: string;
+}
+
+export interface OAuthInitResponse {
+  authorization_url: string;
+  state: string;
+  code_verifier: string;
+}
+
+export interface OAuthCallbackRequest {
+  server_url: string;
+  token_url?: string;
+  code: string;
+  code_verifier: string;
+  client_id?: string;
+  client_secret?: string;
+  redirect_uri: string;
 }
 
 export interface Agent {

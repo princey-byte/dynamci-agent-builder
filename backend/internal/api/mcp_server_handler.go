@@ -30,7 +30,10 @@ func (h *MCPServerHandler) CreateServer(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, server)
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "MCP Server registered successfully",
+		"server":  server,
+	})
 }
 
 func (h *MCPServerHandler) GetServer(c *gin.Context) {
@@ -82,6 +85,57 @@ func (h *MCPServerHandler) DiscoverTools(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"status": "connected",
+		"tools":  tools,
+	})
+}
+
+func (h *MCPServerHandler) InitOAuth(c *gin.Context) {
+	var req models.OAuthInitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	res, err := mcp.InitiateOAuthFlow(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *MCPServerHandler) CallbackOAuth(c *gin.Context) {
+	var req models.OAuthCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tokens, err := mcp.ExchangeOAuthToken(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Auto-discover tools using exchanged OAuth Access Token
+	discReq := models.DiscoverToolsRequest{
+		ServerURL:     req.ServerURL,
+		TransportType: models.TransportSSE,
+		AuthType:      models.AuthTypeOAuth,
+		AuthConfig: models.AuthConfig{
+			OAuth: tokens,
+		},
+	}
+
+	tools, discErr := mcp.DiscoverServerTools(c.Request.Context(), discReq)
+	if discErr != nil {
+		tools = []models.DiscoveredTool{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "authenticated",
+		"tokens": tokens,
 		"tools":  tools,
 	})
 }

@@ -1,4 +1,4 @@
-import { Agent, Skill, MCPTool, MCPServer, Workflow, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool } from './types';
+import { Agent, Skill, MCPTool, MCPServer, Workflow, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool, OAuthInitRequest, OAuthInitResponse, OAuthCallbackRequest, OAuthTokens } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -60,11 +60,23 @@ export const api = {
     transport_type: string;
     auth_type: string;
     auth_config: any;
+    oauth_client_id?: string;
+    oauth_client_secret?: string;
+    oauth_scopes?: string;
     import_tools?: DiscoveredTool[];
-  }) => fetchJSON<MCPServer>('/mcp/servers', { method: 'POST', body: JSON.stringify(data) }),
+  }) => fetchJSON<{ message?: string; server?: MCPServer } | MCPServer>('/mcp/servers', { method: 'POST', body: JSON.stringify(data) }),
   deleteMCPServer: (id: string) => fetchJSON<{ message: string }>(`/mcp/servers/${id}`, { method: 'DELETE' }),
   discoverMCPTools: (data: DiscoverToolsRequest) =>
     fetchJSON<{ status: string; tools: DiscoveredTool[] }>('/mcp/servers/discover', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // OAuth 2.1 Handlers
+  initMCPOAuth: (data: OAuthInitRequest) =>
+    fetchJSON<OAuthInitResponse>('/mcp/oauth/init', { method: 'POST', body: JSON.stringify(data) }),
+  callbackMCPOAuth: (data: OAuthCallbackRequest) =>
+    fetchJSON<{ status: string; tokens: OAuthTokens; tools: DiscoveredTool[] }>('/mcp/oauth/callback', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

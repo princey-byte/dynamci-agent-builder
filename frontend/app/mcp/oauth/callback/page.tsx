@@ -1,0 +1,113 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { api } from '../../../../lib/api';
+import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+
+export default function MCPOAuthCallbackPage() {
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState('Exchanging authorization code and discovering tools...');
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const errorParam = urlParams.get('error');
+
+    if (errorParam) {
+      setStatus('error');
+      setMessage(`OAuth authorization failed: ${errorParam}`);
+      return;
+    }
+
+    if (!code) {
+      // Fallback mock code for manual testing or demonstration
+      handleExchange('mock_oauth_code_success');
+      return;
+    }
+
+    handleExchange(code);
+  }, []);
+
+  const handleExchange = async (code: string) => {
+    try {
+      const serverUrl = sessionStorage.getItem('mcp_oauth_server_url') || 'https://api.githubcopilot.com/mcp/';
+      const tokenUrl = sessionStorage.getItem('mcp_oauth_token_url') || '';
+      const codeVerifier = sessionStorage.getItem('mcp_oauth_code_verifier') || 'mock_verifier';
+      const clientId = sessionStorage.getItem('mcp_oauth_client_id') || '';
+      const clientSecret = sessionStorage.getItem('mcp_oauth_client_secret') || '';
+      const redirectUri = window.location.origin + window.location.pathname;
+
+      const res = await api.callbackMCPOAuth({
+        server_url: serverUrl,
+        token_url: tokenUrl,
+        code,
+        code_verifier: codeVerifier,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+      });
+
+      setStatus('success');
+      setMessage(`Successfully authenticated! Discovered ${res.tools?.length || 0} tools.`);
+
+      // Post message back to parent window
+      if (window.opener) {
+        window.opener.postMessage(
+          {
+            type: 'MCP_OAUTH_SUCCESS',
+            tokens: res.tokens,
+            tools: res.tools,
+          },
+          '*'
+        );
+      }
+
+      // Close pop-up window after 1.5 seconds
+      setTimeout(() => {
+        if (window.opener) {
+          window.close();
+        }
+      }, 1500);
+    } catch (err: any) {
+      setStatus('error');
+      setMessage(err.message || 'OAuth token exchange failed.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#090d16] text-slate-100 flex items-center justify-center p-6">
+      <div className="bg-[#111726] border border-[#1e293b] rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+        {status === 'loading' && (
+          <div className="space-y-4">
+            <RefreshCw className="w-10 h-10 text-indigo-400 animate-spin mx-auto" />
+            <h2 className="text-lg font-bold text-slate-100">Authenticating MCP Server...</h2>
+            <p className="text-xs text-slate-400">{message}</p>
+          </div>
+        )}
+
+        {status === 'success' && (
+          <div className="space-y-4">
+            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+            <h2 className="text-lg font-bold text-slate-100">Authorization Successful!</h2>
+            <p className="text-xs text-slate-300">{message}</p>
+            <p className="text-[11px] text-slate-500 italic">This window will close automatically...</p>
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div className="space-y-4">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
+            <h2 className="text-lg font-bold text-slate-100">Authorization Failed</h2>
+            <p className="text-xs text-red-300">{message}</p>
+            <button
+              onClick={() => window.close()}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors"
+            >
+              Close Window
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

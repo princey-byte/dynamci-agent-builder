@@ -40,6 +40,12 @@ func (c *SSEMCPClient) applyHeaders(req *http.Request) {
 		if c.AuthConfig.BearerToken != "" {
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.AuthConfig.BearerToken))
 		}
+	case models.AuthTypeOAuth:
+		if c.AuthConfig.OAuth != nil && c.AuthConfig.OAuth.AccessToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.AuthConfig.OAuth.AccessToken))
+		} else if c.AuthConfig.BearerToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.AuthConfig.BearerToken))
+		}
 	case models.AuthTypeAPIKey:
 		if c.AuthConfig.APIKeyHeaderName != "" && c.AuthConfig.APIKeyHeaderValue != "" {
 			req.Header.Set(c.AuthConfig.APIKeyHeaderName, c.AuthConfig.APIKeyHeaderValue)
