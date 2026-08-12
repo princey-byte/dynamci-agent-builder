@@ -73,13 +73,16 @@ func (we *WorkerExecutor) ExecuteWorker(
 	}
 
 	// 6. Handle tool calls if triggered
+	var executedResults []executedToolResult
 	if len(resp.ToolCalls) > 0 {
 		for _, tc := range resp.ToolCalls {
 			*stepNum++
 			tStep := *stepNum
 
-			var argsMap map[string]interface{}
-			_ = json.Unmarshal([]byte(tc.Arguments), &argsMap)
+			argsMap := map[string]interface{}{}
+			if tc.Arguments != "" {
+				_ = json.Unmarshal([]byte(tc.Arguments), &argsMap)
+			}
 
 			toolCallMsg := models.StreamMessage{
 				Event:     models.EventToolCall,
@@ -94,8 +97,13 @@ func (we *WorkerExecutor) ExecuteWorker(
 			eventChan <- toolCallMsg
 			_ = we.sessionRepo.AppendLog(ctx, parseUUID(sessionID), &worker.ID, tStep, string(models.EventToolCall), toolCallMsg.Payload)
 
-			// Execute tool via MCP registry
 			toolResult, execErr := we.toolRegistry.ExecuteTool(ctx, tc.Name, argsMap)
+			executedResults = append(executedResults, executedToolResult{
+				Name:      tc.Name,
+				Arguments: argsMap,
+				Result:    toolResult,
+				Err:       execErr,
+			})
 
 			*stepNum++
 			rStep := *stepNum
@@ -116,6 +124,19 @@ func (we *WorkerExecutor) ExecuteWorker(
 		}
 	}
 
-	// Return final text output of worker
+	if len(executedResults) > 0 {
+		followUpMessages := append([]llm.ChatMessage{}, messages...)
+		followUpMessages = append(followUpMessages, llm.ChatMessage{
+			Role:    "user",
+			Content: buildToolResultFollowUp(taskDescription, executedResults),
+		})
+
+		finalResp, followUpErr := provider.Chat(ctx, followUpMessages, nil, worker.Temperature)
+		if followUpErr != nil {
+			return fallbackToolResultOutput(executedResults), nil
+		}
+		return chooseWorkerFinalOutput(finalResp.Content, executedResults), nil
+	}
+
 	return resp.Content, nil
 }
