@@ -50,6 +50,8 @@ func InitiateOAuthFlow(req models.OAuthInitRequest) (*models.OAuthInitResponse, 
 		sURL := strings.ToLower(req.ServerURL)
 		if strings.Contains(sURL, "github") {
 			authURL = "https://github.com/login/oauth/authorize"
+		} else if isNotionMCPServer(req.ServerURL, "") {
+			authURL = "https://mcp.notion.com/authorize"
 		} else if strings.Contains(sURL, "notion") {
 			authURL = "https://api.notion.com/v1/oauth/authorize"
 		} else if strings.Contains(sURL, "atlassian") {
@@ -61,6 +63,16 @@ func InitiateOAuthFlow(req models.OAuthInitRequest) (*models.OAuthInitResponse, 
 
 	if req.ClientID == "" && (strings.Contains(authURL, "github.com") || strings.Contains(req.ServerURL, "github")) {
 		return nil, fmt.Errorf("GitHub OAuth requires a Client ID. Please enter your GitHub OAuth App Client ID (or use Bearer Token auth).")
+	}
+
+	registeredClientSecret := ""
+	if req.ClientID == "" && isNotionMCPServer(req.ServerURL, authURL) {
+		registeredClientID, clientSecret, registerErr := RegisterOAuthClient(context.Background(), req)
+		if registerErr != nil {
+			return nil, registerErr
+		}
+		req.ClientID = registeredClientID
+		registeredClientSecret = clientSecret
 	}
 
 	if req.ClientID == "" && (strings.Contains(authURL, "notion.com") || strings.Contains(req.ServerURL, "notion")) {
@@ -78,7 +90,7 @@ func InitiateOAuthFlow(req models.OAuthInitRequest) (*models.OAuthInitResponse, 
 
 	q := parsed.Query()
 	q.Set("response_type", "code")
-	if strings.Contains(authURL, "notion") || strings.Contains(req.ServerURL, "notion") {
+	if isNotionAPIOAuth(req.ServerURL, authURL) {
 		q.Set("owner", "user")
 	}
 	if strings.Contains(authURL, "atlassian") || strings.Contains(req.ServerURL, "atlassian") {
@@ -93,6 +105,8 @@ func InitiateOAuthFlow(req models.OAuthInitRequest) (*models.OAuthInitResponse, 
 	}
 	if req.Scopes != "" {
 		q.Set("scope", req.Scopes)
+	} else if isNotionMCPServer(req.ServerURL, authURL) {
+		q.Set("scope", "default")
 	}
 	q.Set("state", state)
 	q.Set("code_challenge", challenge)
@@ -104,7 +118,72 @@ func InitiateOAuthFlow(req models.OAuthInitRequest) (*models.OAuthInitResponse, 
 		AuthorizationURL: parsed.String(),
 		State:            state,
 		CodeVerifier:     verifier,
+		ClientID:         req.ClientID,
+		ClientSecret:     registeredClientSecret,
 	}, nil
+}
+
+type oauthClientRegistrationResponse struct {
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret,omitempty"`
+}
+
+func RegisterOAuthClient(ctx context.Context, req models.OAuthInitRequest) (string, string, error) {
+	registrationURL := req.RegistrationURL
+	if registrationURL == "" {
+		registrationURL = "https://mcp.notion.com/register"
+	}
+
+	payload := map[string]interface{}{
+		"client_name":                "AgenticPlatform MCP Client",
+		"redirect_uris":              []string{req.RedirectURI},
+		"grant_types":                []string{"authorization_code", "refresh_token"},
+		"response_types":             []string{"code"},
+		"token_endpoint_auth_method": "none",
+	}
+	if req.Scopes != "" {
+		payload["scope"] = req.Scopes
+	} else if isNotionMCPServer(req.ServerURL, registrationURL) {
+		payload["scope"] = "default"
+	}
+
+	jsonBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", "", err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", registrationURL, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return "", "", err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("User-Agent", "AgenticPlatform/1.0")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to register OAuth client (%s): %w", registrationURL, err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read OAuth registration response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return "", "", fmt.Errorf("OAuth client registration failed with HTTP %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var res oauthClientRegistrationResponse
+	if err := json.Unmarshal(bodyBytes, &res); err != nil {
+		return "", "", fmt.Errorf("failed to parse OAuth registration response: %s", string(bodyBytes))
+	}
+	if res.ClientID == "" {
+		return "", "", fmt.Errorf("OAuth registration returned empty client ID. Response: %s", string(bodyBytes))
+	}
+
+	return res.ClientID, res.ClientSecret, nil
 }
 
 type oauthTokenResponse struct {
@@ -123,6 +202,8 @@ func ExchangeOAuthToken(ctx context.Context, req models.OAuthCallbackRequest) (*
 		sURL := strings.ToLower(req.ServerURL)
 		if strings.Contains(sURL, "github") {
 			tokenURL = "https://github.com/login/oauth/access_token"
+		} else if isNotionMCPServer(req.ServerURL, "") {
+			tokenURL = "https://mcp.notion.com/token"
 		} else if strings.Contains(sURL, "notion") {
 			tokenURL = "https://api.notion.com/v1/oauth/token"
 		} else if strings.Contains(sURL, "atlassian") {
@@ -153,6 +234,24 @@ func ExchangeOAuthToken(ctx context.Context, req models.OAuthCallbackRequest) (*
 			return nil, err
 		}
 		httpReq.Header.Set("Content-Type", "application/json")
+	} else if isNotionAPIOAuth(req.ServerURL, tokenURL) {
+		if req.ClientID == "" || req.ClientSecret == "" {
+			return nil, fmt.Errorf("Notion OAuth token exchange requires both Client ID and Client Secret")
+		}
+
+		jsonPayload := map[string]string{
+			"grant_type":   "authorization_code",
+			"code":         req.Code,
+			"redirect_uri": req.RedirectURI,
+		}
+		jsonBytes, _ := json.Marshal(jsonPayload)
+		httpReq, err = http.NewRequestWithContext(ctx, "POST", tokenURL, bytes.NewBuffer(jsonBytes))
+		if err != nil {
+			return nil, err
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(req.ClientID+":"+req.ClientSecret))))
+		httpReq.Header.Set("Notion-Version", "2026-03-11")
 	} else {
 		// Form-encoded format (GitHub / Notion)
 		form := url.Values{}
@@ -222,4 +321,19 @@ func ExchangeOAuthToken(ctx context.Context, req models.OAuthCallbackRequest) (*
 		ExpiresAt:    expiresAt,
 		Scope:        res.Scope,
 	}, nil
+}
+
+func isNotionMCPServer(serverURL string, endpointURL string) bool {
+	serverURL = strings.ToLower(serverURL)
+	endpointURL = strings.ToLower(endpointURL)
+	return strings.Contains(serverURL, "mcp.notion.com") || strings.Contains(endpointURL, "mcp.notion.com")
+}
+
+func isNotionAPIOAuth(serverURL string, endpointURL string) bool {
+	if isNotionMCPServer(serverURL, endpointURL) {
+		return false
+	}
+	serverURL = strings.ToLower(serverURL)
+	endpointURL = strings.ToLower(endpointURL)
+	return strings.Contains(serverURL, "api.notion.com") || strings.Contains(endpointURL, "api.notion.com")
 }

@@ -75,6 +75,7 @@ export interface DiscoverToolsRequest {
 export interface OAuthInitRequest {
   server_url: string;
   authorize_url?: string;
+  registration_url?: string;
   client_id?: string;
   scopes?: string;
   redirect_uri: string;
@@ -84,6 +85,8 @@ export interface OAuthInitResponse {
   authorization_url: string;
   state: string;
   code_verifier: string;
+  client_id?: string;
+  client_secret?: string;
 }
 
 export interface OAuthCallbackRequest {

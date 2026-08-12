@@ -82,17 +82,20 @@ type DiscoveredTool struct {
 
 // OAuth DTOs
 type OAuthInitRequest struct {
-	ServerURL        string `json:"server_url" binding:"required"`
-	AuthorizeURL     string `json:"authorize_url,omitempty"`
-	ClientID         string `json:"client_id,omitempty"`
-	Scopes           string `json:"scopes,omitempty"`
-	RedirectURI      string `json:"redirect_uri" binding:"required"`
+	ServerURL       string `json:"server_url" binding:"required"`
+	AuthorizeURL    string `json:"authorize_url,omitempty"`
+	RegistrationURL string `json:"registration_url,omitempty"`
+	ClientID        string `json:"client_id,omitempty"`
+	Scopes          string `json:"scopes,omitempty"`
+	RedirectURI     string `json:"redirect_uri" binding:"required"`
 }
 
 type OAuthInitResponse struct {
 	AuthorizationURL string `json:"authorization_url"`
 	State            string `json:"state"`
 	CodeVerifier     string `json:"code_verifier"`
+	ClientID         string `json:"client_id,omitempty"`
+	ClientSecret     string `json:"client_secret,omitempty"`
 }
 
 type OAuthCallbackRequest struct {

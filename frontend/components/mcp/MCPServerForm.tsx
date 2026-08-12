@@ -48,6 +48,10 @@ export function MCPServerForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getErrorMessage = (err: unknown, fallback: string) => {
+    return err instanceof Error ? err.message : fallback;
+  };
+
   // Listen for OAuth Pop-up message completion
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -76,9 +80,11 @@ export function MCPServerForm() {
     } else if (provider === 'notion') {
       setName('Notion Cloud MCP Server');
       setServerUrl('https://mcp.notion.com/mcp');
-      setOauthAuthorizeUrl('https://api.notion.com/v1/oauth/authorize');
-      setOauthTokenUrl('https://api.notion.com/v1/oauth/token');
-      setOauthScopes('read:notion');
+      setOauthAuthorizeUrl('https://mcp.notion.com/authorize');
+      setOauthTokenUrl('https://mcp.notion.com/token');
+      setOauthScopes('default');
+      setOauthClientId('');
+      setOauthClientSecret('');
     } else if (provider === 'atlassian') {
       setName('Atlassian Rovo MCP Server');
       setServerUrl('https://mcp.atlassian.com/v1/mcp');
@@ -125,7 +131,9 @@ export function MCPServerForm() {
       return;
     }
 
-    if (authType === 'oauth2' && (serverUrl.toLowerCase().includes('github') || serverUrl.toLowerCase().includes('notion') || serverUrl.toLowerCase().includes('atlassian')) && !oauthClientId.trim()) {
+    const lowerServerUrl = serverUrl.toLowerCase();
+    const supportsDynamicClientRegistration = lowerServerUrl.includes('mcp.notion.com');
+    if (authType === 'oauth2' && (lowerServerUrl.includes('github') || lowerServerUrl.includes('notion') || lowerServerUrl.includes('atlassian')) && !supportsDynamicClientRegistration && !oauthClientId.trim()) {
       setError('OAuth authorization requires a Client ID from your Developer Settings. Please enter your OAuth Client ID below (or switch to "Bearer Token" or "Custom Headers" to use an API/Personal Token).');
       return;
     }
@@ -135,11 +143,12 @@ export function MCPServerForm() {
 
     try {
       const redirectUri = `${window.location.origin}/mcp/oauth/callback`;
+      const requestClientId = supportsDynamicClientRegistration ? '' : oauthClientId;
 
       const initRes = await api.initMCPOAuth({
         server_url: serverUrl,
         authorize_url: oauthAuthorizeUrl,
-        client_id: oauthClientId,
+        client_id: requestClientId,
         scopes: oauthScopes,
         redirect_uri: redirectUri,
       });
@@ -148,8 +157,12 @@ export function MCPServerForm() {
       localStorage.setItem('mcp_oauth_server_url', serverUrl);
       localStorage.setItem('mcp_oauth_token_url', oauthTokenUrl);
       localStorage.setItem('mcp_oauth_code_verifier', initRes.code_verifier);
-      localStorage.setItem('mcp_oauth_client_id', oauthClientId);
-      localStorage.setItem('mcp_oauth_client_secret', oauthClientSecret);
+      const callbackClientId = initRes.client_id || requestClientId;
+      const callbackClientSecret = initRes.client_secret || oauthClientSecret;
+      setOauthClientId(callbackClientId);
+      setOauthClientSecret(callbackClientSecret);
+      localStorage.setItem('mcp_oauth_client_id', callbackClientId);
+      localStorage.setItem('mcp_oauth_client_secret', callbackClientSecret);
 
       // Launch pop-up window
       const width = 600;
@@ -162,8 +175,8 @@ export function MCPServerForm() {
         'mcp_oauth_popup',
         `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
       );
-    } catch (err: any) {
-      setError(err.message || 'Failed to initiate OAuth authorization flow.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to initiate OAuth authorization flow.'));
       setOauthAuthenticating(false);
     }
   };
@@ -188,8 +201,8 @@ export function MCPServerForm() {
 
       setDiscoveredTools(res.tools || []);
       setDiscoverySuccess(true);
-    } catch (err: any) {
-      setError(err.message || 'Connection or discovery failed. Check server endpoint and auth credentials.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Connection or discovery failed. Check server endpoint and auth credentials.'));
     } finally {
       setDiscovering(false);
     }
@@ -223,8 +236,8 @@ export function MCPServerForm() {
       });
 
       router.push('/mcp-tools');
-    } catch (err: any) {
-      setError(err.message || 'Failed to register MCP server.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to register MCP server.'));
     } finally {
       setSaving(false);
     }
@@ -402,10 +415,10 @@ export function MCPServerForm() {
               <div className="p-3 bg-indigo-950/40 border border-indigo-800/60 rounded-lg text-xs text-indigo-200 space-y-1">
                 <div className="font-semibold text-indigo-300">How Cloud OAuth Authorization Works (GitHub / Notion / Atlassian):</div>
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Cloud OAuth requires an <strong>OAuth Client ID</strong> from your Developer Console (<code className="text-amber-300 font-mono">github.com/settings/developers</code>, <code className="text-amber-300 font-mono">notion.so/my-integrations</code>, or <code className="text-amber-300 font-mono">developer.atlassian.com/console/myapps</code>). Set Callback URL in your app settings to: <code className="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300 font-mono">{typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/mcp/oauth/callback</code>.
+                  GitHub and Atlassian require an <strong>OAuth Client ID</strong> from your provider console. Notion MCP can dynamically register a client when this field is empty; use the hosted MCP OAuth endpoints (<code className="text-amber-300 font-mono">mcp.notion.com/authorize</code> and <code className="text-amber-300 font-mono">mcp.notion.com/token</code>) with scope <code className="text-amber-300 font-mono">default</code>. Set Callback URL in your app settings to: <code className="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300 font-mono">{typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/mcp/oauth/callback</code>.
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  <em>Tip: If you don't have a Public OAuth App ID, switch <strong>Authentication Method</strong> above to <strong>"Bearer Token"</strong> or <strong>"Custom HTTP Headers"</strong> and paste a Personal Access Token / API Token (<code className="font-mono">ghp_...</code>, <code className="font-mono">ntn_...</code>, or <code className="font-mono">Basic base64(email:token)</code>) directly!</em>
+                  <em>Tip: If you do not have a Public OAuth App ID, switch <strong>Authentication Method</strong> above to <strong>Bearer Token</strong> or <strong>Custom HTTP Headers</strong> and paste a Personal Access Token / API Token (<code className="font-mono">ghp_...</code>, <code className="font-mono">ntn_...</code>, or <code className="font-mono">Basic base64(email:token)</code>) directly.</em>
                 </p>
               </div>
 
