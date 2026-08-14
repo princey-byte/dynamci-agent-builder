@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { api } from '../../../lib/api';
 import { Workflow } from '../../../lib/types';
 import { EmptyState } from '../../../components/ui/EmptyState';
-import { Badge } from '../../../components/ui/Badge';
-import { GitFork, Plus, Play, Trash2, Bot, Layers } from 'lucide-react';
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Skeleton } from '../../../components/ui/skeleton';
+import { GitFork, Plus, Play, Trash2, Bot } from 'lucide-react';
 
 export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -25,7 +27,20 @@ export default function WorkflowsPage() {
   };
 
   useEffect(() => {
-    loadWorkflows();
+    let ignore = false;
+
+    api.getWorkflows()
+      .then((data) => {
+        if (!ignore) setWorkflows(data || []);
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleDelete = async (id: string) => {
@@ -37,26 +52,23 @@ export default function WorkflowsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-[#1e293b] pb-5">
+      <div className="flex items-center justify-between border-b pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Agent Workflows</h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Agent Workflows</h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             Hierarchical multi-agent team topologies. Connect Supervisor to specialized Worker agents.
           </p>
         </div>
-        <Link
-          href="/workflows/create"
-          className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-md shadow-indigo-600/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
+        <Button render={<Link href="/workflows/create" />}>
+          <Plus />
           <span>Build Workflow</span>
-        </Link>
+        </Button>
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[1, 2].map((i) => (
-            <div key={i} className="h-44 bg-[#111726] border border-[#1e293b] rounded-xl animate-pulse" />
+            <Skeleton key={i} className="h-44 rounded-xl" />
           ))}
         </div>
       ) : workflows.length === 0 ? (
@@ -70,58 +82,62 @@ export default function WorkflowsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {workflows.map((wf) => (
-            <div
+            <Card
               key={wf.id}
-              className="bg-[#111726] border border-[#1e293b] rounded-xl p-5 hover:border-slate-700 transition-all flex flex-col justify-between"
+              className="flex h-full flex-col justify-between transition-colors hover:ring-foreground/20"
             >
               <div>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-950/60 border border-indigo-800/60 flex items-center justify-center text-indigo-400">
-                      <GitFork className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-100">{wf.name}</h3>
-                      <span className="text-xs text-slate-400">
-                        {wf.nodes?.length || 0} Connected Worker Nodes
-                      </span>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 items-center justify-center rounded-lg border bg-muted text-primary">
+                        <GitFork className="size-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{wf.name}</CardTitle>
+                        <span className="text-xs text-muted-foreground">
+                          {wf.nodes?.length || 0} Connected Worker Nodes
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </CardHeader>
+
+                <CardContent className="flex flex-col gap-4">
 
                 {wf.description && (
-                  <p className="text-xs text-slate-400 line-clamp-2 mb-4 leading-relaxed">
+                  <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                     {wf.description}
                   </p>
                 )}
 
                 {/* Supervisor badge */}
                 {wf.supervisor_agent && (
-                  <div className="flex items-center space-x-2 bg-[#090d16] p-2.5 rounded-lg border border-[#1e293b] text-xs">
-                    <Bot className="w-4 h-4 text-indigo-400" />
-                    <span className="text-slate-400">Supervisor:</span>
-                    <span className="font-semibold text-slate-200">{wf.supervisor_agent.name}</span>
+                  <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-2.5 text-xs">
+                    <Bot className="size-4 text-primary" />
+                    <span className="text-muted-foreground">Supervisor:</span>
+                    <span className="font-semibold text-foreground">{wf.supervisor_agent.name}</span>
                   </div>
                 )}
+                </CardContent>
               </div>
 
-              <div className="flex items-center justify-between mt-5 pt-3 border-t border-[#1e293b]">
-                <button
+              <CardFooter className="justify-between gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => handleDelete(wf.id)}
-                  className="text-slate-400 hover:text-red-400 p-1.5 rounded"
-                  title="Delete Workflow"
+                  aria-label="Delete workflow"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <Link
-                  href={`/workflows/${wf.id}/execute`}
-                  className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow-md shadow-emerald-600/20 transition-all"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <Trash2 />
+                </Button>
+                <Button size="sm" render={<Link href={`/workflows/${wf.id}/execute`} />}>
+                  <Play className="fill-current" />
                   <span>Execute Workflow</span>
-                </Link>
-              </div>
-            </div>
+                </Button>
+              </CardFooter>
+            </Card>
           ))}
         </div>
       )}

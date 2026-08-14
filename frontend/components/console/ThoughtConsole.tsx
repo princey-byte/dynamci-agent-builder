@@ -19,12 +19,12 @@ export function ThoughtConsole({ logs, status }: ThoughtConsoleProps) {
   }, [logs]);
 
   return (
-    <div className="bg-[#090d16] border border-[#1e293b] rounded-xl overflow-hidden shadow-2xl flex flex-col h-[550px]">
+    <div className="bg-background border border-border rounded-xl overflow-hidden shadow-2xl flex flex-col h-[550px]">
       {/* Console Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#111726] border-b border-[#1e293b]">
+      <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border">
         <div className="flex items-center space-x-2">
-          <Terminal className="w-4 h-4 text-indigo-400" />
-          <span className="font-mono text-xs font-semibold text-slate-200 uppercase tracking-wider">
+          <Terminal className="w-4 h-4 text-primary" />
+          <span className="font-mono text-xs font-semibold text-foreground uppercase tracking-wider">
             Real-Time Agent Thought & Execution Console
           </span>
         </div>
@@ -32,12 +32,12 @@ export function ThoughtConsole({ logs, status }: ThoughtConsoleProps) {
       </div>
 
       {/* Stream Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs text-slate-300 scrollbar-thin scrollbar-thumb-slate-800">
+      <div className="flex-1 space-y-2 overflow-y-auto p-4 font-mono text-xs text-foreground">
         {logs.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-500 font-mono text-center p-8 space-y-2">
-            <Terminal className="w-8 h-8 text-slate-700 mb-2" />
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center font-mono text-muted-foreground">
+            <Terminal className="mb-2 size-8 text-muted-foreground/40" />
             <p>Awaiting workflow execution request...</p>
-            <p className="text-[11px] text-slate-600">
+            <p className="text-[11px] text-muted-foreground/80">
               Live step-by-step thoughts, delegations, and tool calls will stream here in real-time.
             </p>
           </div>

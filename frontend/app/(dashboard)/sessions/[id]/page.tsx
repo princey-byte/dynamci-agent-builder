@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { ExecutionSession, SSELogEvent } from '../../../../lib/types';
 import { ThoughtConsole } from '../../../../components/console/ThoughtConsole';
-import { ArrowLeft, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 export default function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -21,15 +21,15 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
   }, [resolvedParams.id]);
 
   if (loading) {
-    return <div className="p-8 text-slate-400 font-mono text-xs">Loading session trace...</div>;
+    return <div className="p-8 text-muted-foreground font-mono text-xs">Loading session trace...</div>;
   }
 
   if (!session) {
-    return <div className="p-8 text-red-400 font-mono text-xs">Session log not found.</div>;
+    return <div className="p-8 text-destructive font-mono text-xs">Session log not found.</div>;
   }
 
   const sseEvents: SSELogEvent[] = (session.logs || []).map((l) => ({
-    event: l.log_type as any,
+    event: l.log_type as SSELogEvent['event'],
     session_id: session.id,
     agent_name: l.agent_name,
     step: l.step_number,
@@ -41,25 +41,25 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="flex items-center space-x-2 text-slate-400 hover:text-slate-200 text-sm transition-colors"
+          className="flex items-center space-x-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Sessions</span>
         </button>
-        <span className="font-mono text-xs text-slate-400">Session ID: {session.id}</span>
+        <span className="font-mono text-xs text-muted-foreground">Session ID: {session.id}</span>
       </div>
 
-      <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-5 space-y-3">
+      <div className="bg-card border border-border rounded-xl p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-slate-100">
+          <h1 className="text-lg font-bold text-foreground">
             Workflow: {session.workflow?.name || 'Execution Session'}
           </h1>
-          <span className="font-mono text-xs text-slate-400">
+          <span className="font-mono text-xs text-muted-foreground">
             Started: {new Date(session.started_at).toLocaleString()}
           </span>
         </div>
-        <div className="bg-[#090d16] p-3 rounded-lg border border-[#1e293b] text-xs font-mono text-slate-300">
-          <span className="text-slate-500 font-semibold mr-2">Query:</span>
+        <div className="bg-background p-3 rounded-lg border border-border text-xs font-mono text-foreground">
+          <span className="text-muted-foreground font-semibold mr-2">Query:</span>
           {session.input_query}
         </div>
       </div>

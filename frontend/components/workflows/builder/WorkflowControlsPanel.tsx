@@ -40,40 +40,40 @@ export function WorkflowControlsPanel({
     <aside className="absolute bottom-5 left-5 top-20 z-20 w-[min(360px,calc(100vw-2.5rem))] overflow-y-auto rounded-xl border border-border-subtle bg-background-surface/95 p-4 shadow-2xl backdrop-blur">
       <div className="space-y-5">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-300">Workflow</p>
-          <h1 className="mt-1 text-lg font-bold text-slate-100">Build agent topology</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">Workflow</p>
+          <h1 className="mt-1 text-lg font-bold text-foreground">Build agent topology</h1>
         </div>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-300">Workflow Name</label>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground">Workflow Name</label>
             <input
               type="text"
               required
               placeholder="e.g. PR Automated Security Audit Team"
               value={workflowName}
               onChange={(event) => onWorkflowNameChange(event.target.value)}
-              className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-300">Description</label>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground">Description</label>
             <textarea
               rows={3}
               placeholder="What should this workflow coordinate?"
               value={description}
               onChange={(event) => onDescriptionChange(event.target.value)}
-              className="w-full resize-none rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+              className="w-full resize-none rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-300">Supervisor Agent</label>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground">Supervisor Agent</label>
             <select
               value={selectedSupervisorID}
               onChange={(event) => onSupervisorChange(event.target.value)}
-              className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
             >
               <option value="">-- Choose Supervisor --</option>
               {supervisors.map((supervisor) => (
@@ -83,15 +83,15 @@ export function WorkflowControlsPanel({
               ))}
             </select>
             {supervisors.length === 0 && (
-              <p className="mt-2 text-xs text-amber-300">Create an agent with role_type supervisor before saving a workflow.</p>
+              <p className="mt-2 text-xs text-agent-tool">Create an agent with role_type supervisor before saving a workflow.</p>
             )}
           </div>
 
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-300">Add Worker Agent</label>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground">Add Worker Agent</label>
             <select
               id="worker-picker"
-              className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
               onChange={(event) => {
                 if (event.target.value) {
                   onAddWorker(event.target.value);
@@ -107,21 +107,21 @@ export function WorkflowControlsPanel({
               ))}
             </select>
             {workers.length === 0 && (
-              <p className="mt-2 text-xs text-amber-300">Create worker agents before adding workflow nodes.</p>
+              <p className="mt-2 text-xs text-agent-tool">Create worker agents before adding workflow nodes.</p>
             )}
           </div>
         </div>
 
         {selectedWorkers.length > 0 && (
           <div className="space-y-3 border-t border-border-subtle pt-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">Worker Routing</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">Worker Routing</h3>
             {selectedWorkers.map((worker, index) => {
               const agent = availableAgents.find((item) => item.id === worker.agent_id);
               return (
                 <div key={worker.agent_id} className="rounded-lg border border-border-subtle bg-background p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="truncate text-xs font-semibold text-slate-200">#{index + 1} {agent?.name}</span>
-                    <button type="button" onClick={() => onRemoveWorker(index)} className="text-xs text-red-400 hover:text-red-300">
+                    <span className="truncate text-xs font-semibold text-foreground">#{index + 1} {agent?.name}</span>
+                    <button type="button" onClick={() => onRemoveWorker(index)} className="text-xs text-destructive hover:text-destructive">
                       Remove
                     </button>
                   </div>
@@ -130,7 +130,7 @@ export function WorkflowControlsPanel({
                     placeholder="Routing condition prompt..."
                     value={worker.routing_condition}
                     onChange={(event) => onWorkerRoutingChange(index, event.target.value)}
-                    className="w-full rounded border border-border-subtle bg-background-surface px-2 py-1.5 text-xs text-slate-200"
+                    className="w-full rounded border border-border-subtle bg-background-surface px-2 py-1.5 text-xs text-foreground"
                   />
                 </div>
               );

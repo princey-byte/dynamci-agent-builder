@@ -282,46 +282,46 @@ export function MCPServerForm() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="flex items-center space-x-2 text-slate-400 hover:text-slate-200 text-sm transition-colors"
+          className="flex items-center space-x-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to MCP Tools</span>
         </button>
-        <h2 className="text-xl font-bold text-slate-100">Register MCP Server & Auth</h2>
+        <h2 className="text-xl font-bold text-foreground">Register MCP Server & Auth</h2>
       </div>
 
       {error && (
-        <div className="p-4 bg-red-950/50 border border-red-800 rounded-lg text-red-300 text-sm flex items-center space-x-2">
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm flex items-center space-x-2">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Quick Presets Banner */}
-      <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-4 flex items-center justify-between">
+      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
         <div>
-          <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">Quick Presets</h4>
-          <p className="text-[11px] text-slate-400">Pre-configure endpoints & OAuth settings for cloud MCP servers</p>
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Quick Presets</h4>
+          <p className="text-[11px] text-muted-foreground">Pre-configure endpoints & OAuth settings for cloud MCP servers</p>
         </div>
         <div className="flex items-center space-x-2">
           <button
             type="button"
             onClick={() => selectPreset('github')}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-[#1e293b] transition-colors"
+            className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground text-xs font-medium rounded-lg border border-border transition-colors"
           >
             GitHub MCP
           </button>
           <button
             type="button"
             onClick={() => selectPreset('notion')}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-[#1e293b] transition-colors"
+            className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground text-xs font-medium rounded-lg border border-border transition-colors"
           >
             Notion MCP
           </button>
           <button
             type="button"
             onClick={() => selectPreset('atlassian')}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-[#1e293b] transition-colors"
+            className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground text-xs font-medium rounded-lg border border-border transition-colors"
           >
             Atlassian Rovo
           </button>
@@ -330,15 +330,15 @@ export function MCPServerForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section 1: Server Info & Transport */}
-        <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-200 border-b border-[#1e293b] pb-2 flex items-center space-x-2">
-            <ServerIcon className="w-4 h-4 text-indigo-400" />
+        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-foreground border-b border-border pb-2 flex items-center space-x-2">
+            <ServerIcon className="w-4 h-4 text-primary" />
             <span>1. Connection & Transport Protocol</span>
           </h3>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                 Server Name
               </label>
               <input
@@ -347,12 +347,12 @@ export function MCPServerForm() {
                 placeholder="e.g. GitHub Enterprise MCP Server"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-ring"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                 Transport Layer
               </label>
               <select
@@ -364,7 +364,7 @@ export function MCPServerForm() {
                     setAuthType('env_vars');
                   }
                 }}
-                className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-ring"
               >
                 <option value="sse">HTTP SSE Transport Endpoint</option>
                 <option value="stdio">Stdio Subprocess Command Transport</option>
@@ -374,7 +374,7 @@ export function MCPServerForm() {
 
           {transportType === 'sse' ? (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                 Server MCP Endpoint URL
               </label>
               <input
@@ -383,13 +383,13 @@ export function MCPServerForm() {
                 placeholder="https://mcp.example.com/mcp"
                 value={serverUrl}
                 onChange={(e) => setServerUrl(e.target.value)}
-                className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
               />
             </div>
           ) : (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                   Command
                 </label>
                 <input
@@ -398,11 +398,11 @@ export function MCPServerForm() {
                   placeholder="npx"
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
-                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                   Arguments, one per line
                 </label>
                 <textarea
@@ -410,11 +410,11 @@ export function MCPServerForm() {
                   placeholder={'-y\n@modelcontextprotocol/server-filesystem\n/mnt/agentic-app'}
                   value={argsText}
                   onChange={(e) => setArgsText(e.target.value)}
-                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                   Working Directory
                 </label>
                 <input
@@ -422,14 +422,14 @@ export function MCPServerForm() {
                   placeholder="/mnt/agentic-app"
                   value={workingDirectory}
                   onChange={(e) => setWorkingDirectory(e.target.value)}
-                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
               Description
             </label>
             <textarea
@@ -437,26 +437,26 @@ export function MCPServerForm() {
               placeholder="Brief description of systems and capabilities exposed by this MCP server..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-ring"
             />
           </div>
         </div>
 
         {/* Section 2: Authentication */}
-        <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-200 border-b border-[#1e293b] pb-2 flex items-center space-x-2">
-            <Lock className="w-4 h-4 text-amber-400" />
+        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-foreground border-b border-border pb-2 flex items-center space-x-2">
+            <Lock className="w-4 h-4 text-agent-tool" />
             <span>2. Authentication Configuration</span>
           </h3>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
               Authentication Method
             </label>
             <select
               value={authType}
               onChange={(e) => setAuthType(e.target.value as AuthType)}
-              className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-ring"
             >
               <option value="none">No Authentication (Public / Local)</option>
               {transportType === 'sse' && (
@@ -475,32 +475,32 @@ export function MCPServerForm() {
 
           {/* OAuth 2.1 Form */}
           {authType === 'oauth2' && (
-            <div className="space-y-4 bg-[#090d16] p-4 rounded-xl border border-[#1e293b]">
+            <div className="space-y-4 bg-background p-4 rounded-xl border border-border">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-indigo-400 flex items-center space-x-1.5">
+                <span className="text-xs font-semibold text-primary flex items-center space-x-1.5">
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>OAuth 2.1 PKCE Pop-up Flow Settings</span>
                 </span>
                 {oauthTokens && (
-                  <span className="px-2 py-0.5 bg-emerald-950 text-emerald-400 text-[10px] font-mono border border-emerald-800 rounded">
+                  <span className="px-2 py-0.5 bg-agent-success/10 text-agent-success text-[10px] font-mono border border-agent-success/30 rounded">
                     AUTHORIZED
                   </span>
                 )}
               </div>
 
-              <div className="p-3 bg-indigo-950/40 border border-indigo-800/60 rounded-lg text-xs text-indigo-200 space-y-1">
-                <div className="font-semibold text-indigo-300">How Cloud OAuth Authorization Works (GitHub / Notion / Atlassian):</div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  GitHub and Atlassian require an <strong>OAuth Client ID</strong> from your provider console. Notion MCP can dynamically register a client when this field is empty; use the hosted MCP OAuth endpoints (<code className="text-amber-300 font-mono">mcp.notion.com/authorize</code> and <code className="text-amber-300 font-mono">mcp.notion.com/token</code>) with scope <code className="text-amber-300 font-mono">default</code>. Set Callback URL in your app settings to: <code className="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300 font-mono">{typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/mcp/oauth/callback</code>.
+              <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg text-xs text-primary space-y-1">
+                <div className="font-semibold text-primary">How Cloud OAuth Authorization Works (GitHub / Notion / Atlassian):</div>
+                <p className="text-[11px] text-foreground leading-relaxed">
+                  GitHub and Atlassian require an <strong>OAuth Client ID</strong> from your provider console. Notion MCP can dynamically register a client when this field is empty; use the hosted MCP OAuth endpoints (<code className="text-agent-tool font-mono">mcp.notion.com/authorize</code> and <code className="text-agent-tool font-mono">mcp.notion.com/token</code>) with scope <code className="text-agent-tool font-mono">default</code>. Set Callback URL in your app settings to: <code className="bg-background px-1.5 py-0.5 rounded text-agent-tool font-mono">{typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/mcp/oauth/callback</code>.
                 </p>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   <em>Tip: If you do not have a Public OAuth App ID, switch <strong>Authentication Method</strong> above to <strong>Bearer Token</strong> or <strong>Custom HTTP Headers</strong> and paste a Personal Access Token / API Token (<code className="font-mono">ghp_...</code>, <code className="font-mono">ntn_...</code>, or <code className="font-mono">Basic base64(email:token)</code>) directly.</em>
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                     Authorization URL
                   </label>
                   <input
@@ -508,11 +508,11 @@ export function MCPServerForm() {
                     placeholder="https://github.com/login/oauth/authorize"
                     value={oauthAuthorizeUrl}
                     onChange={(e) => setOauthAuthorizeUrl(e.target.value)}
-                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs text-foreground font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                     Token Exchange URL
                   </label>
                   <input
@@ -520,14 +520,14 @@ export function MCPServerForm() {
                     placeholder="https://github.com/login/oauth/access_token"
                     value={oauthTokenUrl}
                     onChange={(e) => setOauthTokenUrl(e.target.value)}
-                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs text-foreground font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                     Client ID
                   </label>
                   <input
@@ -535,11 +535,11 @@ export function MCPServerForm() {
                     placeholder="e.g. Ov23li..."
                     value={oauthClientId}
                     onChange={(e) => setOauthClientId(e.target.value)}
-                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs text-foreground font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                     Client Secret (GitHub Apps)
                   </label>
                   <input
@@ -547,11 +547,11 @@ export function MCPServerForm() {
                     placeholder="e.g. 8f9a2b3c..."
                     value={oauthClientSecret}
                     onChange={(e) => setOauthClientSecret(e.target.value)}
-                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs text-foreground font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                     Scopes
                   </label>
                   <input
@@ -559,7 +559,7 @@ export function MCPServerForm() {
                     placeholder="repo,read:user"
                     value={oauthScopes}
                     onChange={(e) => setOauthScopes(e.target.value)}
-                    className="w-full bg-[#111726] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
+                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs text-foreground font-mono"
                   />
                 </div>
               </div>
@@ -569,7 +569,7 @@ export function MCPServerForm() {
                   type="button"
                   onClick={handleLaunchOAuthPopup}
                   disabled={oauthAuthenticating}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium text-xs rounded-lg shadow-md transition-all"
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-agent-tool hover:bg-agent-tool/90 disabled:opacity-50 text-white font-medium text-xs rounded-lg shadow-md transition-all"
                 >
                   <ExternalLink className={`w-4 h-4 ${oauthAuthenticating ? 'animate-spin' : ''}`} />
                   <span>{oauthAuthenticating ? 'Waiting for Pop-up Consent...' : 'Launch OAuth 2.1 Pop-up Window'}</span>
@@ -581,7 +581,7 @@ export function MCPServerForm() {
           {/* Bearer Token Form */}
           {authType === 'bearer' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                 Bearer Token
               </label>
               <input
@@ -590,7 +590,7 @@ export function MCPServerForm() {
                 placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                 value={bearerToken}
                 onChange={(e) => setBearerToken(e.target.value)}
-                className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
               />
             </div>
           )}
@@ -599,7 +599,7 @@ export function MCPServerForm() {
           {authType === 'api_key' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                   Header Name
                 </label>
                 <input
@@ -608,11 +608,11 @@ export function MCPServerForm() {
                   placeholder="X-API-Key"
                   value={apiKeyName}
                   onChange={(e) => setApiKeyName(e.target.value)}
-                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                   Header Value / Secret Key
                 </label>
                 <input
@@ -621,7 +621,7 @@ export function MCPServerForm() {
                   placeholder="secret-key-value"
                   value={apiKeyValue}
                   onChange={(e) => setApiKeyValue(e.target.value)}
-                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
                 />
               </div>
             </div>
@@ -630,7 +630,7 @@ export function MCPServerForm() {
           {/* Custom HTTP Headers Form */}
           {authType === 'custom_headers' && (
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                 Custom Headers
               </label>
               {customHeaders.map((h, i) => (
@@ -644,7 +644,7 @@ export function MCPServerForm() {
                       newH[i].key = e.target.value;
                       setCustomHeaders(newH);
                     }}
-                    className="flex-1 bg-[#090d16] border border-[#1e293b] rounded-lg px-3 py-2 text-xs font-mono text-slate-100"
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono text-foreground"
                   />
                   <input
                     type="text"
@@ -655,12 +655,12 @@ export function MCPServerForm() {
                       newH[i].value = e.target.value;
                       setCustomHeaders(newH);
                     }}
-                    className="flex-1 bg-[#090d16] border border-[#1e293b] rounded-lg px-3 py-2 text-xs font-mono text-slate-100"
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono text-foreground"
                   />
                   <button
                     type="button"
                     onClick={() => setCustomHeaders(customHeaders.filter((_, idx) => idx !== i))}
-                    className="p-2 text-slate-400 hover:text-red-400"
+                    className="p-2 text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -669,7 +669,7 @@ export function MCPServerForm() {
               <button
                 type="button"
                 onClick={() => setCustomHeaders([...customHeaders, { key: '', value: '' }])}
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center space-x-1 pt-1"
+                className="text-xs text-primary hover:text-primary font-semibold flex items-center space-x-1 pt-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Header Pair</span>
@@ -680,7 +680,7 @@ export function MCPServerForm() {
           {/* Stdio Environment Variables Form */}
           {authType === 'env_vars' && (
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                 Process Environment Variables
               </label>
               {envVars.map((env, i) => (
@@ -694,7 +694,7 @@ export function MCPServerForm() {
                       newE[i].key = e.target.value;
                       setEnvVars(newE);
                     }}
-                    className="flex-1 bg-[#090d16] border border-[#1e293b] rounded-lg px-3 py-2 text-xs font-mono text-slate-100"
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono text-foreground"
                   />
                   <input
                     type="password"
@@ -705,12 +705,12 @@ export function MCPServerForm() {
                       newE[i].value = e.target.value;
                       setEnvVars(newE);
                     }}
-                    className="flex-1 bg-[#090d16] border border-[#1e293b] rounded-lg px-3 py-2 text-xs font-mono text-slate-100"
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono text-foreground"
                   />
                   <button
                     type="button"
                     onClick={() => setEnvVars(envVars.filter((_, idx) => idx !== i))}
-                    className="p-2 text-slate-400 hover:text-red-400"
+                    className="p-2 text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -719,7 +719,7 @@ export function MCPServerForm() {
               <button
                 type="button"
                 onClick={() => setEnvVars([...envVars, { key: '', value: '' }])}
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center space-x-1 pt-1"
+                className="text-xs text-primary hover:text-primary font-semibold flex items-center space-x-1 pt-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Variable Pair</span>
@@ -729,10 +729,10 @@ export function MCPServerForm() {
         </div>
 
         {/* Section 3: Live Discovery & Tool Selection */}
-        <div className="bg-[#111726] border border-[#1e293b] rounded-xl p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-[#1e293b] pb-3">
-            <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-              <Wrench className="w-4 h-4 text-emerald-400" />
+        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <h3 className="text-sm font-semibold text-foreground flex items-center space-x-2">
+              <Wrench className="w-4 h-4 text-agent-success" />
               <span>3. Live Connection & Tool Discovery (tools/list)</span>
             </h3>
 
@@ -740,7 +740,7 @@ export function MCPServerForm() {
               type="button"
               onClick={handleDiscover}
               disabled={discovering}
-              className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-md shadow-emerald-600/20 transition-all"
+              className="flex items-center space-x-2 px-4 py-2 bg-agent-success hover:bg-agent-success/90 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-md shadow-emerald-600/20 transition-all"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${discovering ? 'animate-spin' : ''}`} />
               <span>{discovering ? 'Connecting...' : 'Connect & Discover Tools'}</span>
@@ -748,33 +748,33 @@ export function MCPServerForm() {
           </div>
 
           {discoverySuccess && (
-            <div className="p-3 bg-emerald-950/50 border border-emerald-800 rounded-lg text-emerald-300 text-xs flex items-center space-x-2">
+            <div className="p-3 bg-agent-success/10/50 border border-agent-success/30 rounded-lg text-agent-success text-xs flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               <span>Successfully connected to MCP Server! Discovered {discoveredTools.length} tools.</span>
             </div>
           )}
 
           {discoveryWarning && (
-            <div className="p-3 bg-amber-950/50 border border-amber-800 rounded-lg text-amber-300 text-xs flex items-center space-x-2">
+            <div className="p-3 bg-agent-tool/10 border border-agent-tool/30 rounded-lg text-agent-tool text-xs flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{discoveryWarning}</span>
             </div>
           )}
 
           {discoveryMessage && !discoverySuccess && !discoveryWarning && (
-            <div className="p-3 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 text-xs">
+            <div className="p-3 bg-background border border-border rounded-lg text-foreground text-xs">
               {discoveryMessage}
             </div>
           )}
 
           {discoveredTools.length > 0 && (
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <div className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
                 Select Discovered Tools to Import:
               </div>
-              <div className="divide-y divide-[#1e293b] border border-[#1e293b] rounded-lg bg-[#090d16]">
+              <div className="divide-y divide-border border border-border rounded-lg bg-background">
                 {discoveredTools.map((tool, idx) => (
-                  <div key={idx} className="p-3 flex items-start space-x-3 hover:bg-[#1a2236]/40 transition-colors">
+                  <div key={idx} className="p-3 flex items-start space-x-3 hover:bg-accent/40 transition-colors">
                     <input
                       type="checkbox"
                       checked={tool.selected !== false}
@@ -782,8 +782,8 @@ export function MCPServerForm() {
                       className="mt-1 accent-indigo-500 cursor-pointer"
                     />
                     <div className="flex-1">
-                      <div className="text-xs font-mono font-semibold text-indigo-300">{tool.name}</div>
-                      <div className="text-xs text-slate-400 mt-0.5">{tool.description}</div>
+                      <div className="text-xs font-mono font-semibold text-primary">{tool.name}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{tool.description}</div>
                     </div>
                   </div>
                 ))}
@@ -796,7 +796,7 @@ export function MCPServerForm() {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center space-x-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg shadow-lg shadow-indigo-600/30 transition-all"
+            className="flex items-center space-x-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium text-sm rounded-lg shadow-lg shadow-primary/20 transition-all"
           >
             <Save className="w-4 h-4" />
             <span>{saving ? 'Registering Server...' : 'Register MCP Server & Import Tools'}</span>

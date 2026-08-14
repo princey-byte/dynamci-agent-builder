@@ -18,11 +18,11 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   }, [resolvedParams.id]);
 
   if (loading) {
-    return <div className="p-8 text-slate-400 font-mono text-xs">Loading agent details...</div>;
+    return <div className="p-8 text-muted-foreground font-mono text-xs">Loading agent details...</div>;
   }
 
   if (!agent) {
-    return <div className="p-8 text-red-400 font-mono text-xs">Agent not found.</div>;
+    return <div className="p-8 text-destructive font-mono text-xs">Agent not found.</div>;
   }
 
   return <AgentForm initialData={agent} isEdit={true} />;

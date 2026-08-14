@@ -7,10 +7,10 @@ interface SSEStatusPillProps {
 export function SSEStatusPill({ status }: SSEStatusPillProps) {
   if (status === 'running') {
     return (
-      <span className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-mono bg-emerald-950/80 border border-emerald-800 text-emerald-300">
+      <span className="inline-flex items-center gap-2 rounded-full border border-agent-success/30 bg-agent-success/10 px-3 py-1 font-mono text-xs text-agent-success">
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-agent-success opacity-75"></span>
+          <span className="relative inline-flex size-2 rounded-full bg-agent-success"></span>
         </span>
         <span>Live Stream Connected</span>
       </span>
@@ -19,8 +19,8 @@ export function SSEStatusPill({ status }: SSEStatusPillProps) {
 
   if (status === 'completed') {
     return (
-      <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-mono bg-indigo-950/80 border border-indigo-800 text-indigo-300">
-        <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-xs text-primary">
+        <span className="size-2 rounded-full bg-primary"></span>
         <span>Execution Completed</span>
       </span>
     );
@@ -28,16 +28,16 @@ export function SSEStatusPill({ status }: SSEStatusPillProps) {
 
   if (status === 'error') {
     return (
-      <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-mono bg-red-950/80 border border-red-800 text-red-300">
-        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 font-mono text-xs text-destructive">
+        <span className="size-2 rounded-full bg-destructive"></span>
         <span>Connection Terminated</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-mono bg-slate-800 border border-slate-700 text-slate-400">
-      <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+    <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted px-3 py-1 font-mono text-xs text-muted-foreground">
+      <span className="size-2 rounded-full bg-muted-foreground"></span>
       <span>Idle</span>
     </span>
   );

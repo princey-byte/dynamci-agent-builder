@@ -36,7 +36,7 @@ export function WorkflowCanvas({ nodes, edges, onNodesChange }: WorkflowCanvasPr
         elementsSelectable
         className="bg-background"
       >
-        <Background color="#1e293b" gap={20} />
+        <Background color="var(--border)" gap={20} />
         <Controls />
       </ReactFlow>
     </section>

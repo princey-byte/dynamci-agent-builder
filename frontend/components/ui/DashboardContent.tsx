@@ -15,7 +15,7 @@ export function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto p-8">
+    <main className="flex-1 overflow-y-auto bg-background p-8 text-foreground">
       <div className="mx-auto max-w-7xl">{children}</div>
     </main>
   );

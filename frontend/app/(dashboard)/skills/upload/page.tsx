@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../../lib/api';
+import { FileType } from '../../../../lib/types';
 import { ArrowLeft, Upload, FileCode } from 'lucide-react';
 
 export default function UploadSkillPage() {
@@ -52,8 +53,8 @@ export default function UploadSkillPage() {
         });
       }
       router.push('/skills');
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload skill');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to upload skill');
     } finally {
       setUploading(false);
     }
@@ -64,49 +65,49 @@ export default function UploadSkillPage() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="flex items-center space-x-2 text-slate-400 hover:text-slate-200 text-sm transition-colors"
+          className="flex items-center space-x-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Skills</span>
         </button>
-        <h2 className="text-xl font-bold text-slate-100">Upload Domain Skill Document</h2>
+        <h2 className="text-xl font-bold text-foreground">Upload Domain Skill Document</h2>
       </div>
 
       {error && (
-        <div className="p-4 bg-red-950/50 border border-red-800 rounded-lg text-red-300 text-sm">
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-[#111726] border border-[#1e293b] rounded-xl p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl p-6 space-y-5">
         {/* File Drag Drop Input */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
             Upload .md or .txt File
           </label>
-          <div className="border-2 border-dashed border-[#1e293b] hover:border-indigo-500/50 rounded-xl p-6 text-center cursor-pointer bg-[#090d16] transition-colors relative">
+          <div className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-6 text-center cursor-pointer bg-background transition-colors relative">
             <input
               type="file"
               accept=".md,.txt,.markdown"
               onChange={handleFileChange}
               className="absolute inset-0 opacity-0 cursor-pointer"
             />
-            <FileCode className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
-            <p className="text-sm font-medium text-slate-200">
+            <FileCode className="w-8 h-8 text-primary mx-auto mb-2" />
+            <p className="text-sm font-medium text-foreground">
               {file ? file.name : 'Click to upload or drag & drop .md / .txt file'}
             </p>
-            <p className="text-xs text-slate-500 mt-1">SOP manuals, guides, guidelines, API specs</p>
+            <p className="text-xs text-muted-foreground mt-1">SOP manuals, guides, guidelines, API specs</p>
           </div>
         </div>
 
         <div className="relative flex py-2 items-center">
-          <div className="flex-grow border-t border-[#1e293b]"></div>
-          <span className="flex-shrink mx-4 text-xs font-mono text-slate-500 uppercase">OR Paste Raw Text</span>
-          <div className="flex-grow border-t border-[#1e293b]"></div>
+          <div className="flex-grow border-t border-border"></div>
+          <span className="flex-shrink mx-4 text-xs font-mono text-muted-foreground uppercase">OR Paste Raw Text</span>
+          <div className="flex-grow border-t border-border"></div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
             Skill Title
           </label>
           <input
@@ -115,18 +116,18 @@ export default function UploadSkillPage() {
             placeholder="e.g. OWASP Security Audit SOP Guide"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+            className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-ring"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
             Document Type
           </label>
           <select
             value={fileType}
-            onChange={(e) => setFileType(e.target.value as any)}
-            className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+            onChange={(e) => setFileType(e.target.value as FileType)}
+            className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-ring"
           >
             <option value="markdown">Markdown (.md)</option>
             <option value="text">Raw Text (.txt)</option>
@@ -135,7 +136,7 @@ export default function UploadSkillPage() {
 
         {!file && (
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
               Skill Content
             </label>
             <textarea
@@ -143,7 +144,7 @@ export default function UploadSkillPage() {
               placeholder="Paste raw Markdown or SOP instructions here..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
             />
           </div>
         )}
@@ -152,7 +153,7 @@ export default function UploadSkillPage() {
           <button
             type="submit"
             disabled={uploading}
-            className="flex items-center space-x-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg shadow-lg shadow-indigo-600/30 transition-all"
+            className="flex items-center space-x-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium text-sm rounded-lg shadow-lg shadow-primary/20 transition-all"
           >
             <Upload className="w-4 h-4" />
             <span>{uploading ? 'Ingesting Skill...' : 'Ingest Skill File'}</span>

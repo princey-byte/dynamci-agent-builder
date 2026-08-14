@@ -6,6 +6,8 @@ import { api } from '../../../lib/api';
 import { Agent } from '../../../lib/types';
 import { AgentCard } from '../../../components/agents/AgentCard';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { Button } from '../../../components/ui/button';
+import { Skeleton } from '../../../components/ui/skeleton';
 import { Bot, Plus, RefreshCw } from 'lucide-react';
 
 export default function AgentsPage() {
@@ -25,7 +27,20 @@ export default function AgentsPage() {
   };
 
   useEffect(() => {
-    loadAgents();
+    let ignore = false;
+
+    api.getAgents()
+      .then((data) => {
+        if (!ignore) setAgents(data || []);
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleDelete = async (id: string) => {
@@ -38,28 +53,27 @@ export default function AgentsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#1e293b] pb-5">
+      <div className="flex items-center justify-between border-b pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight">AI Agents Library</h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">AI Agents Library</h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             Configure custom personas, multi-LLM providers, and attached skills.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <button
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
             onClick={loadAgents}
-            className="p-2 bg-[#111726] border border-[#1e293b] hover:border-slate-700 text-slate-300 rounded-lg transition-colors"
-            title="Refresh Agents"
+            aria-label="Refresh agents"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <Link
-            href="/agents/create"
-            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-md shadow-indigo-600/20 transition-all"
-          >
-            <Plus className="w-4 h-4" />
+            <RefreshCw className={loading ? 'animate-spin' : undefined} />
+          </Button>
+          <Button render={<Link href="/agents/create" />}>
+            <Plus />
             <span>Create Agent</span>
-          </Link>
+          </Button>
         </div>
       </div>
 
@@ -67,7 +81,7 @@ export default function AgentsPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 bg-[#111726] border border-[#1e293b] rounded-xl animate-pulse" />
+            <Skeleton key={i} className="h-48 rounded-xl" />
           ))}
         </div>
       ) : agents.length === 0 ? (

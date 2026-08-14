@@ -6,6 +6,8 @@ import { api } from '../../../lib/api';
 import { MCPServer } from '../../../lib/types';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { MCPServerCard } from '../../../components/mcp/MCPServerCard';
+import { Button } from '../../../components/ui/button';
+import { Skeleton } from '../../../components/ui/skeleton';
 import { Plus, RefreshCw, Server } from 'lucide-react';
 
 export default function MCPToolsPage() {
@@ -25,7 +27,20 @@ export default function MCPToolsPage() {
   };
 
   useEffect(() => {
-    loadServers();
+    let ignore = false;
+
+    api.getMCPServers()
+      .then((data) => {
+        if (!ignore) setServers(data || []);
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleDelete = async (id: string) => {
@@ -37,35 +52,34 @@ export default function MCPToolsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-[#1e293b] pb-5">
+      <div className="flex items-center justify-between border-b pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight">MCP Server & Tool Registry</h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">MCP Server & Tool Registry</h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             Model Context Protocol integration. Configure authenticated MCP servers and dynamically discover exposed tools.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <button
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
             onClick={loadServers}
-            className="p-2 bg-[#111726] border border-[#1e293b] hover:border-slate-700 text-slate-300 rounded-lg transition-colors"
-            title="Refresh Servers"
+            aria-label="Refresh servers"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <Link
-            href="/mcp-tools/register"
-            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-md shadow-indigo-600/20 transition-all"
-          >
-            <Plus className="w-4 h-4" />
+            <RefreshCw className={loading ? 'animate-spin' : undefined} />
+          </Button>
+          <Button render={<Link href="/mcp-tools/register" />}>
+            <Plus />
             <span>Register MCP Server</span>
-          </Link>
+          </Button>
         </div>
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[1, 2].map((i) => (
-            <div key={i} className="h-48 bg-[#111726] border border-[#1e293b] rounded-xl animate-pulse" />
+            <Skeleton key={i} className="h-48 rounded-xl" />
           ))}
         </div>
       ) : servers.length === 0 ? (

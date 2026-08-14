@@ -17,7 +17,7 @@ export default function CreateWorkflowPage() {
   }, []);
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center text-xs font-mono text-slate-400">Loading agents topology...</div>;
+    return <div className="flex h-full items-center justify-center text-xs font-mono text-muted-foreground">Loading agents topology...</div>;
   }
 
   return <WorkflowBuilder availableAgents={agents} />;

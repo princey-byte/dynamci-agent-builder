@@ -24,8 +24,8 @@ export function useWorkflowExecution(workflowId: string) {
 
         if (parsed.event === 'WORKFLOW_COMPLETE') {
           setStatus('completed');
-          if (parsed.payload?.final_output) {
-            setFinalOutput(parsed.payload.final_output);
+          if (parsed.payload.final_output) {
+            setFinalOutput(String(parsed.payload.final_output));
           }
           eventSource.close();
         } else if (parsed.event === 'ERROR') {

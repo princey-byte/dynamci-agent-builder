@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import { MCPServer } from '../../lib/types';
-import { Badge } from '../ui/Badge';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Server, Wrench, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface MCPServerCardProps {
@@ -46,94 +48,95 @@ export function MCPServerCard({ server, onDelete }: MCPServerCardProps) {
     : server.server_url;
 
   return (
-    <div className="bg-[#111726] border border-[#1e293b] rounded-xl overflow-hidden hover:border-slate-700 transition-all flex flex-col justify-between">
-      <div className="p-5">
+    <Card className="flex h-full flex-col justify-between overflow-hidden transition-colors hover:ring-foreground/20">
+      <div>
         {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-950/60 border border-amber-800/60 flex items-center justify-center text-amber-400">
-              <Server className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-slate-100">{server.name}</h3>
-              <div className="flex items-center space-x-2 mt-1">
-                <Badge variant={server.transport_type === 'sse' ? 'worker' : 'supervisor'}>
-                  {server.transport_type.toUpperCase()}
-                </Badge>
-                {getAuthBadge()}
-                {getStatusBadge()}
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg border bg-agent-tool/10 text-agent-tool">
+                <Server className="size-5" />
+              </div>
+              <div>
+                <CardTitle className="text-base">{server.name}</CardTitle>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant={server.transport_type === 'sse' ? 'worker' : 'supervisor'}>
+                    {server.transport_type.toUpperCase()}
+                  </Badge>
+                  {getAuthBadge()}
+                  {getStatusBadge()}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-3">
 
         {server.description && (
-          <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
+          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
             {server.description}
           </p>
         )}
 
-        <div className="bg-[#090d16] p-2.5 rounded-lg border border-[#1e293b] text-xs font-mono text-slate-300 truncate mb-3">
-          <span className="text-slate-500 mr-2">{connectionLabel}</span>
+        <div className="truncate rounded-lg border bg-muted/40 p-2.5 font-mono text-xs text-foreground">
+          <span className="mr-2 text-muted-foreground">{connectionLabel}</span>
           {connectionValue}
         </div>
 
         {server.last_connection_error && (
-          <div className="mb-3 rounded-lg border border-red-900 bg-red-950/30 p-2 text-[11px] text-red-300">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
             {server.last_connection_error}
           </div>
         )}
 
         {/* Discovered Tools Accordion */}
-        <div className="border border-[#1e293b] rounded-lg overflow-hidden bg-[#090d16]">
+        <div className="overflow-hidden rounded-lg border bg-muted/30">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-full flex items-center justify-between p-2.5 text-xs font-semibold text-slate-300 hover:bg-[#1a2236]/40 transition-colors"
+            className="flex w-full items-center justify-between p-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
-            <div className="flex items-center space-x-2">
-              <Wrench className="w-3.5 h-3.5 text-amber-400" />
+            <div className="flex items-center gap-2">
+              <Wrench className="size-3.5 text-agent-tool" />
               <span>
                 Discovered Tools ({server.tools?.length || 0})
               </span>
             </div>
-            {expanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+            {expanded ? <ChevronDown className="size-4 text-muted-foreground" /> : <ChevronRight className="size-4 text-muted-foreground" />}
           </button>
 
           {expanded && (
-            <div className="divide-y divide-[#1e293b] p-2">
+            <div className="divide-y divide-border p-2">
               {!server.tools || server.tools.length === 0 ? (
-                <div className="text-[11px] text-slate-500 italic p-2">No tools imported for this server.</div>
+                <div className="p-2 text-[11px] italic text-muted-foreground">No tools imported for this server.</div>
               ) : (
                 server.tools.map((tool) => (
-                  <div key={tool.id} className="p-2 space-y-1">
-                    <div className="text-xs font-mono font-semibold text-amber-300 flex items-center space-x-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <div key={tool.id} className="flex flex-col gap-1 p-2">
+                    <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-agent-tool">
+                      <span className="size-1.5 rounded-full bg-agent-tool"></span>
                       <span>{tool.name}</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">{tool.description}</p>
+                    <p className="text-[11px] leading-snug text-muted-foreground">{tool.description}</p>
                   </div>
                 ))
               )}
             </div>
           )}
         </div>
+        </CardContent>
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-[#1e293b] bg-[#090d16]/50 text-xs font-mono text-slate-500">
-        <span>
+      <CardFooter className="justify-between gap-3 font-mono text-xs text-muted-foreground">
+        <span className="truncate">
           {server.last_discovered_at ? `Discovered: ${new Date(server.last_discovered_at).toLocaleDateString()}` : `Registered: ${new Date(server.created_at).toLocaleDateString()}`}
         </span>
         {onDelete && (
-          <button
-            onClick={() => onDelete(server.id)}
-            className="text-slate-400 hover:text-red-400 p-1 rounded transition-colors"
-            title="Delete Server & Discovered Tools"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Button variant="ghost" size="icon-sm" onClick={() => onDelete(server.id)} aria-label="Delete server and discovered tools">
+            <Trash2 />
+          </Button>
         )}
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

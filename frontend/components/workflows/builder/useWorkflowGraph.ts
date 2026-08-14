@@ -71,7 +71,7 @@ export function useWorkflowGraph({ availableAgents, selectedSupervisorID, select
         source: 'sup-node',
         target: `worker-node-${worker.agent_id}`,
         animated: true,
-        style: { stroke: '#6366f1', strokeWidth: 2 },
+        style: { stroke: 'var(--primary)', strokeWidth: 2 },
       })),
     [selectedWorkers]
   );

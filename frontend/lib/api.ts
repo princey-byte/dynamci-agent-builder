@@ -1,4 +1,4 @@
-import { Agent, Skill, MCPTool, MCPServer, Workflow, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool, OAuthInitRequest, OAuthInitResponse, OAuthCallbackRequest, OAuthTokens, MCPDiscoveryResult } from './types';
+import { Agent, Skill, MCPTool, MCPServer, Workflow, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool, OAuthInitRequest, OAuthInitResponse, OAuthCallbackRequest, OAuthTokens, MCPDiscoveryResult, AuthConfig, FileType, JsonValue } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -38,7 +38,7 @@ export const api = {
   // Skills
   getSkills: () => fetchJSON<Skill[]>('/skills'),
   getSkill: (id: string) => fetchJSON<Skill>(`/skills/${id}`),
-  createSkill: (data: { title: string; content: string; file_type: string }) =>
+  createSkill: (data: { title: string; content: string; file_type: FileType }) =>
     fetchJSON<Skill>('/skills', { method: 'POST', body: JSON.stringify(data) }),
   uploadSkillFile: async (formData: FormData): Promise<Skill> => {
     const res = await fetch(`${API_BASE}/skills`, {
@@ -62,7 +62,7 @@ export const api = {
     working_directory?: string;
     transport_type: string;
     auth_type: string;
-    auth_config: any;
+    auth_config: AuthConfig;
     oauth_client_id?: string;
     oauth_client_secret?: string;
     oauth_scopes?: string;
@@ -87,7 +87,7 @@ export const api = {
   // MCP Tools (Legacy / Direct)
   getMCPTools: () => fetchJSON<MCPTool[]>('/mcp/tools'),
   getMCPTool: (id: string) => fetchJSON<MCPTool>(`/mcp/tools/${id}`),
-  registerMCPTool: (data: { name: string; description: string; server_url: string; transport_type?: string; input_schema: any }) =>
+  registerMCPTool: (data: { name: string; description: string; server_url: string; transport_type?: string; input_schema: JsonValue }) =>
     fetchJSON<MCPTool>('/mcp/tools', { method: 'POST', body: JSON.stringify(data) }),
   deleteMCPTool: (id: string) => fetchJSON<{ message: string }>(`/mcp/tools/${id}`, { method: 'DELETE' }),
 

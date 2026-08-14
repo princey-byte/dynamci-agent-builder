@@ -92,22 +92,22 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
   };
 
   return (
-    <form onSubmit={handleSave} className="relative h-full min-h-0 overflow-hidden bg-background text-slate-100">
+    <form onSubmit={handleSave} className="relative h-full min-h-0 overflow-hidden bg-background text-foreground">
       <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-background-surface/95 px-5 py-3 backdrop-blur">
         <button
           type="button"
           onClick={() => router.back()}
-          className="flex items-center space-x-2 text-sm text-slate-400 transition-colors hover:text-slate-200"
+          className="flex items-center space-x-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Back to Workflows</span>
         </button>
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-slate-100">Visual Workflow Builder</h2>
+          <h2 className="text-sm font-semibold text-foreground">Visual Workflow Builder</h2>
           <button
             type="submit"
             disabled={saving || supervisors.length === 0}
-            className="flex items-center space-x-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500 disabled:opacity-50"
+            className="flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             <span>{saving ? 'Saving...' : 'Save Workflow'}</span>
@@ -116,7 +116,7 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
       </div>
 
       {error && (
-        <div className="absolute left-5 right-5 top-16 z-30 rounded-lg border border-red-800 bg-red-950/90 p-3 text-sm text-red-300 shadow-xl">
+        <div className="absolute left-5 right-5 top-16 z-30 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive shadow-xl">
           {error}
         </div>
       )}

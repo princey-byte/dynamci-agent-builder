@@ -4,6 +4,8 @@ export type TransportType = 'sse' | 'stdio';
 export type AuthType = 'none' | 'bearer' | 'api_key' | 'custom_headers' | 'env_vars' | 'oauth2';
 export type MCPConnectionStatus = 'REGISTERED' | 'CONNECTED' | 'ERROR';
 export type MCPDiscoveryStatus = 'connected' | 'empty' | 'error';
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type JsonRecord = Record<string, unknown>;
 
 export interface MCPDiscoveryResult {
   status: MCPDiscoveryStatus;
@@ -49,7 +51,7 @@ export interface MCPTool {
   args?: string[];
   working_directory?: string;
   transport_type: TransportType;
-  input_schema: any;
+  input_schema: JsonValue | JsonRecord;
   created_at: string;
 }
 
@@ -80,7 +82,7 @@ export interface MCPServer {
 export interface DiscoveredTool {
   name: string;
   description: string;
-  input_schema: any;
+  input_schema: JsonValue | JsonRecord;
   selected?: boolean;
 }
 
@@ -162,7 +164,7 @@ export interface SessionLog {
   agent_name?: string;
   step_number: number;
   log_type: 'AGENT_THOUGHT' | 'AGENT_DELEGATION' | 'TOOL_CALL' | 'TOOL_RESULT' | 'TOKEN_STREAM' | 'WORKFLOW_COMPLETE' | 'ERROR';
-  content: any;
+  content: JsonValue | JsonRecord;
   created_at: string;
 }
 
@@ -183,5 +185,5 @@ export interface SSELogEvent {
   session_id: string;
   agent_name?: string;
   step: number;
-  payload: any;
+  payload: JsonRecord;
 }
