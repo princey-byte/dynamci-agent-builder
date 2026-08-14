@@ -70,7 +70,7 @@ export function AgentCard({ agent, onDelete }: AgentCardProps) {
 
       {/* Footer Actions */}
       <CardFooter className="justify-end gap-2">
-        <Button variant="ghost" size="icon" render={<Link href={`/agents/${agent.id}/edit`} aria-label="Edit agent" />}>
+        <Button nativeButton={false} variant="ghost" size="icon" render={<Link href={`/agents/${agent.id}/edit`} aria-label="Edit agent" />}>
           <Edit3 />
         </Button>
         {onDelete && (

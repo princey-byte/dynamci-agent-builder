@@ -69,7 +69,7 @@ export default function MCPToolsPage() {
           >
             <RefreshCw className={loading ? 'animate-spin' : undefined} />
           </Button>
-          <Button render={<Link href="/mcp-tools/register" />}>
+          <Button nativeButton={false} render={<Link href="/mcp-tools/register" />}>
             <Plus />
             <span>Register MCP Server</span>
           </Button>

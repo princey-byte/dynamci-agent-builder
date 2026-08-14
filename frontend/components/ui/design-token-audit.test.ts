@@ -22,7 +22,7 @@ const migratedFiles = [
   "app/(dashboard)/sessions/page.tsx",
   "app/(dashboard)/sessions/[id]/page.tsx",
   "app/mcp/oauth/callback/page.tsx",
-  "components/ui/Sidebar.tsx",
+  "components/app-sidebar.tsx",
   "components/ui/DashboardContent.tsx",
   "components/ui/EmptyState.tsx",
   "components/agents/AgentCard.tsx",

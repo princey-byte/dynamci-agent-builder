@@ -59,7 +59,7 @@ export default function WorkflowsPage() {
             Hierarchical multi-agent team topologies. Connect Supervisor to specialized Worker agents.
           </p>
         </div>
-        <Button render={<Link href="/workflows/create" />}>
+        <Button nativeButton={false} render={<Link href="/workflows/create" />}>
           <Plus />
           <span>Build Workflow</span>
         </Button>
@@ -132,7 +132,7 @@ export default function WorkflowsPage() {
                 >
                   <Trash2 />
                 </Button>
-                <Button size="sm" render={<Link href={`/workflows/${wf.id}/execute`} />}>
+                <Button nativeButton={false} size="sm" render={<Link href={`/workflows/${wf.id}/execute`} />}>
                   <Play className="fill-current" />
                   <span>Execute Workflow</span>
                 </Button>

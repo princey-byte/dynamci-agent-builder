@@ -23,7 +23,7 @@ export function EmptyState({ icon: Icon, title, description, actionHref, actionL
           <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
         </div>
         {actionHref && actionLabel ? (
-          <Button render={<Link href={actionHref} />}>
+          <Button nativeButton={false} render={<Link href={actionHref} />}>
             {actionLabel}
           </Button>
         ) : null}

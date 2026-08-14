@@ -95,7 +95,7 @@ export default function SessionsPage() {
                   </td>
                   <td className="p-4 text-muted-foreground">{new Date(session.started_at).toLocaleString()}</td>
                   <td className="p-4 text-right">
-                    <Button variant="outline" size="sm" render={<Link href={`/sessions/${session.id}`} />}>
+                    <Button nativeButton={false} variant="outline" size="sm" render={<Link href={`/sessions/${session.id}`} />}>
                       View Log Replay
                     </Button>
                   </td>

@@ -59,7 +59,7 @@ export default function SkillsPage() {
             Dynamic SOP ingestion. Attach Markdown (.md) or text (.txt) files directly to agents.
           </p>
         </div>
-        <Button render={<Link href="/skills/upload" />}>
+        <Button nativeButton={false} render={<Link href="/skills/upload" />}>
           <Upload />
           <span>Upload Skill Document</span>
         </Button>

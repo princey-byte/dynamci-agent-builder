@@ -70,7 +70,7 @@ export default function AgentsPage() {
           >
             <RefreshCw className={loading ? 'animate-spin' : undefined} />
           </Button>
-          <Button render={<Link href="/agents/create" />}>
+          <Button nativeButton={false} render={<Link href="/agents/create" />}>
             <Plus />
             <span>Create Agent</span>
           </Button>
