@@ -26,6 +26,27 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 	if err != nil {
 		return nil, fmt.Errorf("invalid supervisor agent ID: %w", err)
 	}
+	supervisor, err := r.agentRepo.GetByID(ctx, supervisorID)
+	if err != nil {
+		return nil, fmt.Errorf("supervisor agent not found: %w", err)
+	}
+
+	workerAgents := make([]models.Agent, 0, len(req.Nodes))
+	for _, nodeReq := range req.Nodes {
+		agentID, parseErr := uuid.Parse(nodeReq.AgentID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid worker agent ID: %w", parseErr)
+		}
+		agent, agentErr := r.agentRepo.GetByID(ctx, agentID)
+		if agentErr != nil {
+			return nil, fmt.Errorf("worker agent not found: %w", agentErr)
+		}
+		workerAgents = append(workerAgents, *agent)
+	}
+
+	if err := models.ValidateWorkflowRoles(supervisor, workerAgents); err != nil {
+		return nil, err
+	}
 	now := time.Now()
 
 	query := `
@@ -45,7 +66,7 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 	for i, nodeReq := range req.Nodes {
 		agentID, parseErr := uuid.Parse(nodeReq.AgentID)
 		if parseErr != nil {
-			continue
+			return nil, fmt.Errorf("invalid worker agent ID: %w", parseErr)
 		}
 
 		var parentNodeID *uuid.UUID
