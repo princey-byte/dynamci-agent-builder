@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useCallback } from 'react';
-import { SSELogEvent } from '../lib/types';
+import { SSELogEvent, NodeExecutionStatus, EdgeExecutionStatus } from '../lib/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -7,11 +9,17 @@ export function useWorkflowExecution(workflowId: string) {
   const [logs, setLogs] = useState<SSELogEvent[]>([]);
   const [status, setStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
   const [finalOutput, setFinalOutput] = useState<string | null>(null);
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  const [nodeStatuses, setNodeStatuses] = useState<Record<string, NodeExecutionStatus>>({});
+  const [edgeStatuses, setEdgeStatuses] = useState<Record<string, EdgeExecutionStatus>>({});
 
   const startExecution = useCallback((query: string) => {
     setLogs([]);
     setFinalOutput(null);
     setStatus('running');
+    setNodeStatuses({});
+    setEdgeStatuses({});
+    setActiveNodeId(null);
 
     const encodedQuery = encodeURIComponent(query);
     const url = `${API_BASE}/workflows/${workflowId}/execute/stream?query=${encodedQuery}`;
@@ -22,14 +30,36 @@ export function useWorkflowExecution(workflowId: string) {
         const parsed: SSELogEvent = JSON.parse(e.data);
         setLogs((prev) => [...prev, parsed]);
 
+        const payload = parsed.payload as Record<string, unknown>;
+
+        // Track active executing node
+        if (payload?.node_id || payload?.agent_id || parsed.agent_name) {
+          const targetId = String(payload?.node_id || payload?.agent_id || '');
+          if (targetId) {
+            setActiveNodeId(targetId);
+            setNodeStatuses((prev) => ({ ...prev, [targetId]: 'running' }));
+          }
+        }
+
+        // Track condition evaluation & branch skipping
+        if (parsed.event === 'CONDITION_EVALUATED' && payload?.edge_id) {
+          const edgeId = String(payload.edge_id);
+          setEdgeStatuses((prev) => ({ ...prev, [edgeId]: 'traversed' }));
+        } else if (parsed.event === 'BRANCH_SKIPPED' && payload?.edge_id) {
+          const edgeId = String(payload.edge_id);
+          setEdgeStatuses((prev) => ({ ...prev, [edgeId]: 'skipped' }));
+        }
+
         if (parsed.event === 'WORKFLOW_COMPLETE') {
           setStatus('completed');
-          if (parsed.payload.final_output) {
-            setFinalOutput(String(parsed.payload.final_output));
+          setActiveNodeId(null);
+          if (payload?.final_output) {
+            setFinalOutput(String(payload.final_output));
           }
           eventSource.close();
         } else if (parsed.event === 'ERROR') {
           setStatus('error');
+          setActiveNodeId(null);
           eventSource.close();
         }
       } catch (err) {
@@ -39,8 +69,16 @@ export function useWorkflowExecution(workflowId: string) {
 
     eventSource.onmessage = handleEvent;
 
-    // Listen for custom event types sent over SSE
-    ['AGENT_THOUGHT', 'AGENT_DELEGATION', 'TOOL_CALL', 'TOOL_RESULT', 'WORKFLOW_COMPLETE', 'ERROR'].forEach((eventType) => {
+    [
+      'AGENT_THOUGHT',
+      'AGENT_DELEGATION',
+      'TOOL_CALL',
+      'TOOL_RESULT',
+      'CONDITION_EVALUATED',
+      'BRANCH_SKIPPED',
+      'WORKFLOW_COMPLETE',
+      'ERROR',
+    ].forEach((eventType) => {
       eventSource.addEventListener(eventType, handleEvent);
     });
 
@@ -55,5 +93,13 @@ export function useWorkflowExecution(workflowId: string) {
     };
   }, [workflowId]);
 
-  return { logs, status, finalOutput, startExecution };
+  return {
+    logs,
+    status,
+    finalOutput,
+    activeNodeId,
+    nodeStatuses,
+    edgeStatuses,
+    startExecution,
+  };
 }

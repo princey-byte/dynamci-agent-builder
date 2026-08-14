@@ -4,11 +4,15 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Agent } from '../../lib/types';
 import { api } from '../../lib/api';
-import { Save, ArrowLeft } from 'lucide-react';
 import { WorkflowCanvas } from './builder/WorkflowCanvas';
-import { WorkflowControlsPanel } from './builder/WorkflowControlsPanel';
+import { WorkflowTopBar } from './builder/WorkflowTopBar';
+import { AgentPaletteSidebar } from './builder/AgentPaletteSidebar';
+import { EdgeConditionDrawer } from './builder/EdgeConditionDrawer';
+import { QuickAttachModal } from './builder/QuickAttachModal';
 import { SelectedWorker } from './builder/types';
 import { useWorkflowGraph } from './builder/useWorkflowGraph';
+import { Edge } from '@xyflow/react';
+import { WorkflowEdgeData } from './builder/types';
 
 interface WorkflowBuilderProps {
   availableAgents: Agent[];
@@ -23,14 +27,12 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { supervisors, workers, availableWorkerOptions, nodes, edges, onNodesChange } = useWorkflowGraph({
-    availableAgents,
-    selectedSupervisorID,
-    selectedWorkers,
-  });
+  // Quick attach child state
+  const [quickAttachParentId, setQuickAttachParentId] = useState<string | null>(null);
 
-  const addWorkerNode = (agentId: string) => {
+  const addWorkerNode = (agentId: string, parentSourceId?: string) => {
     if (!agentId) return;
+
     setSelectedWorkers((previous) => {
       if (previous.some((worker) => worker.agent_id === agentId)) {
         return previous;
@@ -44,27 +46,62 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
         },
       ];
     });
+
+    // If added from a parent node, also create connection edge
+    if (parentSourceId) {
+      setTimeout(() => {
+        addEdgeDirect(parentSourceId, `worker-node-${agentId}`);
+      }, 50);
+    }
   };
 
-  const removeWorkerNode = (index: number) => {
+  const removeWorkerNode = (agentId: string) => {
     setSelectedWorkers((previous) =>
       previous
-        .filter((_, itemIndex) => itemIndex !== index)
+        .filter((w) => w.agent_id !== agentId)
         .map((worker, itemIndex) => ({ ...worker, execution_order: itemIndex + 1 }))
     );
   };
 
-  const updateWorkerRouting = (index: number, value: string) => {
-    setSelectedWorkers((previous) =>
-      previous.map((worker, itemIndex) => (itemIndex === index ? { ...worker, routing_condition: value } : worker))
-    );
+  const {
+    supervisors,
+    workers,
+    availableWorkerOptions,
+    selectedWorkerIDs,
+    nodes,
+    edges,
+    selectedEdgeId,
+    selectedEdgeData,
+    setSelectedEdgeId,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    updateEdgeCondition,
+    deleteEdge,
+    autoLayout,
+    addEdgeDirect,
+  } = useWorkflowGraph({
+    availableAgents,
+    selectedSupervisorID,
+    selectedWorkers,
+    onAddWorker: addWorkerNode,
+    onRemoveWorker: removeWorkerNode,
+    onOpenQuickAttach: (parentId) => setQuickAttachParentId(parentId),
+  });
+
+  const handleEdgeClick = (_event: React.MouseEvent, edge: Edge<WorkflowEdgeData>) => {
+    setSelectedEdgeId(edge.id);
   };
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!workflowName.trim()) {
+      setError('Please provide a workflow name.');
+      return;
+    }
     const selectedSupervisor = supervisors.find((supervisor) => supervisor.id === selectedSupervisorID);
     if (!selectedSupervisor) {
-      setError('Please select an agent with role_type supervisor. Worker agents cannot supervise workflows.');
+      setError('Please select an agent with role_type supervisor as the root coordinator.');
       return;
     }
     const invalidWorker = selectedWorkers.find((worker) => !workers.some((agent) => agent.id === worker.agent_id));
@@ -76,12 +113,26 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
     setSaving(true);
     setError(null);
 
+    // Format edges for backend API
+    const formattedEdges = edges.map((edge) => {
+      const sourceClean = edge.source.replace('worker-node-', '').replace('sup-node', selectedSupervisorID);
+      const targetClean = edge.target.replace('worker-node-', '');
+      return {
+        source_node_id: sourceClean,
+        target_node_id: targetClean,
+        condition_type: edge.data?.condition_type || 'always',
+        condition_expression: edge.data?.condition_expression || '',
+        label: edge.data?.label || '',
+      };
+    });
+
     try {
       await api.createWorkflow({
         name: workflowName,
         description,
         supervisor_agent_id: selectedSupervisorID,
         nodes: selectedWorkers,
+        edges: formattedEdges,
       });
       router.push('/workflows');
     } catch (err: unknown) {
@@ -92,53 +143,58 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
   };
 
   return (
-    <form onSubmit={handleSave} className="relative h-full min-h-0 overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-background-surface/95 px-5 py-3 backdrop-blur">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="flex items-center space-x-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to Workflows</span>
-        </button>
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-foreground">Visual Workflow Builder</h2>
-          <button
-            type="submit"
-            disabled={saving || supervisors.length === 0}
-            className="flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            <span>{saving ? 'Saving...' : 'Save Workflow'}</span>
-          </button>
-        </div>
-      </div>
+    <div className="relative h-full min-h-0 overflow-hidden bg-background text-foreground">
+      <WorkflowTopBar
+        workflowName={workflowName}
+        description={description}
+        saving={saving}
+        canSave={Boolean(selectedSupervisorID && workflowName.trim())}
+        onWorkflowNameChange={setWorkflowName}
+        onDescriptionChange={setDescription}
+        onAutoLayout={autoLayout}
+        onSave={handleSave}
+      />
 
       {error && (
-        <div className="absolute left-5 right-5 top-16 z-30 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive shadow-xl">
+        <div className="absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-xl border border-destructive/30 bg-destructive/10 px-5 py-2.5 text-xs font-semibold text-destructive shadow-2xl backdrop-blur">
           {error}
         </div>
       )}
 
-      <WorkflowControlsPanel
-        workflowName={workflowName}
-        description={description}
-        selectedSupervisorID={selectedSupervisorID}
-        selectedWorkers={selectedWorkers}
+      <AgentPaletteSidebar
         supervisors={supervisors}
         workers={workers}
-        availableWorkerOptions={availableWorkerOptions}
-        availableAgents={availableAgents}
-        onWorkflowNameChange={setWorkflowName}
-        onDescriptionChange={setDescription}
-        onSupervisorChange={setSelectedSupervisorID}
-        onAddWorker={addWorkerNode}
-        onRemoveWorker={removeWorkerNode}
-        onWorkerRoutingChange={updateWorkerRouting}
+        selectedSupervisorId={selectedSupervisorID}
+        selectedWorkerIds={selectedWorkerIDs}
+        onSelectSupervisor={setSelectedSupervisorID}
+        onAddWorker={(agentId) => addWorkerNode(agentId)}
       />
 
-      <WorkflowCanvas nodes={nodes} edges={edges} onNodesChange={onNodesChange} />
-    </form>
+      <WorkflowCanvas
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onEdgeClick={handleEdgeClick}
+      />
+
+      <EdgeConditionDrawer
+        edgeId={selectedEdgeId}
+        edgeData={selectedEdgeData}
+        isOpen={Boolean(selectedEdgeId)}
+        onClose={() => setSelectedEdgeId(null)}
+        onSave={updateEdgeCondition}
+        onDelete={deleteEdge}
+      />
+
+      <QuickAttachModal
+        isOpen={Boolean(quickAttachParentId)}
+        parentSourceId={quickAttachParentId}
+        availableWorkers={availableWorkerOptions}
+        onClose={() => setQuickAttachParentId(null)}
+        onSelectWorker={(agentId, parentId) => addWorkerNode(agentId, parentId)}
+      />
+    </div>
   );
 }

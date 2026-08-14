@@ -1,21 +1,49 @@
 'use client';
 
-import { Background, Controls, Edge, Node, OnNodesChange, ReactFlow } from '@xyflow/react';
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
+import {
+  Background,
+  Controls,
+  Edge,
+  Node,
+  OnConnect,
+  OnEdgesChange,
+  OnNodesChange,
+  ReactFlow,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { SupervisorNode, WorkerNode } from './WorkflowNodes';
-import { SupervisorNodeData, WorkerNodeData } from './types';
+import { CustomConditionEdge } from './CustomConditionEdge';
+import { SupervisorNodeData, WorkerNodeData, WorkflowEdgeData } from './types';
 
 interface WorkflowCanvasProps {
   nodes: Node<SupervisorNodeData | WorkerNodeData>[];
-  edges: Edge[];
+  edges: Edge<WorkflowEdgeData>[];
   onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  onConnect: OnConnect;
+  onEdgeClick: (event: React.MouseEvent, edge: Edge<WorkflowEdgeData>) => void;
 }
 
-export function WorkflowCanvas({ nodes, edges, onNodesChange }: WorkflowCanvasProps) {
+export function WorkflowCanvas({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onEdgeClick,
+}: WorkflowCanvasProps) {
   const nodeTypes = useMemo(
     () => ({
       supervisorNode: SupervisorNode,
       workerNode: WorkerNode,
+    }),
+    []
+  );
+
+  const edgeTypes = useMemo(
+    () => ({
+      conditionEdge: CustomConditionEdge,
     }),
     []
   );
@@ -26,18 +54,22 @@ export function WorkflowCanvas({ nodes, edges, onNodesChange }: WorkflowCanvasPr
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onEdgeClick={onEdgeClick}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         minZoom={0.25}
         maxZoom={1.5}
         nodesDraggable
-        nodesConnectable={false}
+        nodesConnectable
         elementsSelectable
         className="bg-background"
       >
-        <Background color="var(--border)" gap={20} />
-        <Controls />
+        <Background color="var(--border-subtle)" gap={20} size={1} />
+        <Controls className="!border-border-subtle !bg-background-surface shadow-lg" />
       </ReactFlow>
     </section>
   );

@@ -7,6 +7,9 @@ export type MCPDiscoveryStatus = 'connected' | 'empty' | 'error';
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 export type JsonRecord = Record<string, unknown>;
 
+export type NodeExecutionStatus = 'idle' | 'running' | 'completed' | 'skipped' | 'error';
+export type EdgeExecutionStatus = 'idle' | 'traversed' | 'skipped';
+
 export interface MCPDiscoveryResult {
   status: MCPDiscoveryStatus;
   message: string;

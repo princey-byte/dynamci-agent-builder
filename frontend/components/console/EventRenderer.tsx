@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { SSELogEvent } from '../../lib/types';
-import { Brain, ArrowRight, Wrench, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Brain, ArrowRight, Wrench, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, GitBranch, Ban } from 'lucide-react';
 
 interface EventRendererProps {
   log: SSELogEvent;
@@ -10,7 +10,7 @@ interface EventRendererProps {
 
 export function EventRenderer({ log }: EventRendererProps) {
   const [expanded, setExpanded] = useState(true);
-  const payload = log.payload;
+  const payload = log.payload as Record<string, unknown>;
 
   switch (log.event) {
     case 'AGENT_THOUGHT': {
@@ -28,7 +28,7 @@ export function EventRenderer({ log }: EventRendererProps) {
 
     case 'AGENT_DELEGATION': {
       const fromAgent = String(payload.from_agent ?? 'Supervisor');
-      const toAgent = String(payload.to_agent ?? 'Worker');
+      const toAgent = String(payload.to_agent ?? payload.agent_name ?? 'Worker');
       const taskDesc = String(payload.task_description ?? '');
       return (
         <div className="my-2 rounded-lg border border-agent-delegation/30 bg-agent-delegation/10 p-3 font-mono text-xs">
@@ -38,6 +38,34 @@ export function EventRenderer({ log }: EventRendererProps) {
             <span>{toAgent}</span>
           </div>
           {taskDesc && <p className="text-foreground mt-1">{taskDesc}</p>}
+        </div>
+      );
+    }
+
+    case 'CONDITION_EVALUATED': {
+      const label = String(payload.label || payload.condition_type || 'Routing Wire');
+      const reason = String(payload.reason || 'Criteria matched successfully');
+      return (
+        <div className="my-2 rounded-lg border border-primary/40 bg-primary/10 p-3 font-mono text-xs shadow-sm">
+          <div className="mb-1 flex items-center gap-2 font-bold text-primary">
+            <GitBranch className="size-3.5" />
+            <span>CONDITION_MATCHED: {label}</span>
+          </div>
+          <p className="text-foreground text-[11px] mt-0.5">{reason}</p>
+        </div>
+      );
+    }
+
+    case 'BRANCH_SKIPPED': {
+      const label = String(payload.label || payload.condition_type || payload.agent_name || 'Branch');
+      const reason = String(payload.reason || 'Criteria not met');
+      return (
+        <div className="my-2 rounded-lg border border-border-subtle bg-muted/40 p-3 font-mono text-xs opacity-75">
+          <div className="mb-1 flex items-center gap-2 font-semibold text-muted-foreground">
+            <Ban className="size-3.5" />
+            <span>BRANCH_SKIPPED: {label}</span>
+          </div>
+          <p className="text-muted-foreground text-[11px] mt-0.5">{reason}</p>
         </div>
       );
     }
