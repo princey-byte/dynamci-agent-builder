@@ -78,15 +78,12 @@ func (h *MCPServerHandler) DiscoverTools(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	tools, err := mcp.DiscoverServerTools(c.Request.Context(), req)
+	result, err := mcp.DiscoverServerTools(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, result)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"status": "connected",
-		"tools":  tools,
-	})
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *MCPServerHandler) InitOAuth(c *gin.Context) {
@@ -128,14 +125,19 @@ func (h *MCPServerHandler) CallbackOAuth(c *gin.Context) {
 		},
 	}
 
-	tools, discErr := mcp.DiscoverServerTools(c.Request.Context(), discReq)
+	result, discErr := mcp.DiscoverServerTools(c.Request.Context(), discReq)
 	if discErr != nil {
-		tools = []models.DiscoveredTool{}
+		result = models.MCPDiscoveryResult{
+			Status:  models.MCPDiscoveryStatusError,
+			Message: discErr.Error(),
+			Tools:   []models.DiscoveredTool{},
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "authenticated",
-		"tokens": tokens,
-		"tools":  tools,
+		"status":    "authenticated",
+		"tokens":    tokens,
+		"tools":     result.Tools,
+		"discovery": result,
 	})
 }

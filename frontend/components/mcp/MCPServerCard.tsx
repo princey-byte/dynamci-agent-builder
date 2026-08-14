@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { MCPServer } from '../../lib/types';
 import { Badge } from '../ui/Badge';
-import { Server, Wrench, Trash2, ChevronDown, ChevronRight, Lock, Terminal, Globe } from 'lucide-react';
+import { Server, Wrench, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface MCPServerCardProps {
   server: MCPServer;
@@ -30,6 +30,21 @@ export function MCPServerCard({ server, onDelete }: MCPServerCardProps) {
     }
   };
 
+  const getStatusBadge = () => {
+    if (server.status === 'CONNECTED') {
+      return <Badge variant="success">CONNECTED</Badge>;
+    }
+    if (server.status === 'ERROR') {
+      return <Badge variant="amber">ERROR</Badge>;
+    }
+    return <Badge variant="default">REGISTERED</Badge>;
+  };
+
+  const connectionLabel = server.transport_type === 'stdio' ? 'Command:' : 'Endpoint:';
+  const connectionValue = server.transport_type === 'stdio'
+    ? [server.command, ...(server.args || [])].filter(Boolean).join(' ')
+    : server.server_url;
+
   return (
     <div className="bg-[#111726] border border-[#1e293b] rounded-xl overflow-hidden hover:border-slate-700 transition-all flex flex-col justify-between">
       <div className="p-5">
@@ -46,6 +61,7 @@ export function MCPServerCard({ server, onDelete }: MCPServerCardProps) {
                   {server.transport_type.toUpperCase()}
                 </Badge>
                 {getAuthBadge()}
+                {getStatusBadge()}
               </div>
             </div>
           </div>
@@ -58,9 +74,15 @@ export function MCPServerCard({ server, onDelete }: MCPServerCardProps) {
         )}
 
         <div className="bg-[#090d16] p-2.5 rounded-lg border border-[#1e293b] text-xs font-mono text-slate-300 truncate mb-3">
-          <span className="text-slate-500 mr-2">Endpoint/Cmd:</span>
-          {server.server_url}
+          <span className="text-slate-500 mr-2">{connectionLabel}</span>
+          {connectionValue}
         </div>
+
+        {server.last_connection_error && (
+          <div className="mb-3 rounded-lg border border-red-900 bg-red-950/30 p-2 text-[11px] text-red-300">
+            {server.last_connection_error}
+          </div>
+        )}
 
         {/* Discovered Tools Accordion */}
         <div className="border border-[#1e293b] rounded-lg overflow-hidden bg-[#090d16]">
@@ -99,7 +121,9 @@ export function MCPServerCard({ server, onDelete }: MCPServerCardProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between px-5 py-3 border-t border-[#1e293b] bg-[#090d16]/50 text-xs font-mono text-slate-500">
-        <span>Connected: {new Date(server.created_at).toLocaleDateString()}</span>
+        <span>
+          {server.last_discovered_at ? `Discovered: ${new Date(server.last_discovered_at).toLocaleDateString()}` : `Registered: ${new Date(server.created_at).toLocaleDateString()}`}
+        </span>
         {onDelete && (
           <button
             onClick={() => onDelete(server.id)}

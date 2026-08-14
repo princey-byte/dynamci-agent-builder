@@ -13,6 +13,9 @@ export function MCPServerForm() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [serverUrl, setServerUrl] = useState('');
+  const [command, setCommand] = useState('');
+  const [argsText, setArgsText] = useState('');
+  const [workingDirectory, setWorkingDirectory] = useState('');
   const [transportType, setTransportType] = useState<TransportType>('sse');
 
   // Step 2: Authentication
@@ -44,12 +47,27 @@ export function MCPServerForm() {
   const [discovering, setDiscovering] = useState(false);
   const [discoveredTools, setDiscoveredTools] = useState<DiscoveredTool[]>([]);
   const [discoverySuccess, setDiscoverySuccess] = useState(false);
+  const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
+  const [discoveryWarning, setDiscoveryWarning] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const getErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error ? err.message : fallback;
+  };
+
+  const getStdioArgs = () =>
+    argsText
+      .split('\n')
+      .map((arg) => arg.trim())
+      .filter(Boolean);
+
+  const getConnectionTarget = () => {
+    if (transportType === 'stdio') {
+      return command.trim();
+    }
+    return serverUrl.trim();
   };
 
   // Listen for OAuth Pop-up message completion
@@ -182,27 +200,40 @@ export function MCPServerForm() {
   };
 
   const handleDiscover = async () => {
-    if (!serverUrl.trim()) {
-      setError('Please enter a Server URL or Subprocess Command.');
+    if (!getConnectionTarget()) {
+      setError(transportType === 'stdio' ? 'Please enter the stdio command, for example npx.' : 'Please enter the MCP endpoint URL.');
       return;
     }
 
     setDiscovering(true);
     setError(null);
+    setDiscoveryMessage(null);
+    setDiscoveryWarning(null);
     setDiscoverySuccess(false);
 
     try {
       const res = await api.discoverMCPTools({
-        server_url: serverUrl,
+        server_url: transportType === 'sse' ? serverUrl : '',
+        command: transportType === 'stdio' ? command.trim() : undefined,
+        args: transportType === 'stdio' ? getStdioArgs() : undefined,
+        working_directory: transportType === 'stdio' ? workingDirectory.trim() : undefined,
         transport_type: transportType,
         auth_type: authType,
         auth_config: buildAuthConfig(),
       });
 
       setDiscoveredTools(res.tools || []);
-      setDiscoverySuccess(true);
+      setDiscoveryMessage(res.message);
+      if (res.status === 'connected') {
+        setDiscoverySuccess(true);
+      } else if (res.status === 'empty') {
+        setDiscoveryWarning(res.message || 'Connected, but this MCP server returned no tools.');
+      } else {
+        setError(res.message || 'Connection or discovery failed.');
+      }
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Connection or discovery failed. Check server endpoint and auth credentials.'));
+      setError(getErrorMessage(err, 'Connection or discovery failed. Check command, endpoint, auth credentials, and server logs.'));
+      setDiscoverySuccess(false);
     } finally {
       setDiscovering(false);
     }
@@ -225,7 +256,10 @@ export function MCPServerForm() {
       await api.createMCPServer({
         name,
         description,
-        server_url: serverUrl,
+        server_url: transportType === 'sse' ? serverUrl : '',
+        command: transportType === 'stdio' ? command.trim() : undefined,
+        args: transportType === 'stdio' ? getStdioArgs() : undefined,
+        working_directory: transportType === 'stdio' ? workingDirectory.trim() : undefined,
         transport_type: transportType,
         auth_type: authType,
         auth_config: buildAuthConfig(),
@@ -338,19 +372,61 @@ export function MCPServerForm() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              {transportType === 'sse' ? 'Server SSE Endpoint URL' : 'Subprocess Command'}
-            </label>
-            <input
-              type="text"
-              required
-              placeholder={transportType === 'sse' ? 'https://mcp.internal.company.com/sse' : 'npx -y @modelcontextprotocol/server-github'}
-              value={serverUrl}
-              onChange={(e) => setServerUrl(e.target.value)}
-              className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
-            />
-          </div>
+          {transportType === 'sse' ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Server MCP Endpoint URL
+              </label>
+              <input
+                type="url"
+                required
+                placeholder="https://mcp.example.com/mcp"
+                value={serverUrl}
+                onChange={(e) => setServerUrl(e.target.value)}
+                className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Command
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="npx"
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Arguments, one per line
+                </label>
+                <textarea
+                  rows={5}
+                  placeholder={'-y\n@modelcontextprotocol/server-filesystem\n/mnt/agentic-app'}
+                  value={argsText}
+                  onChange={(e) => setArgsText(e.target.value)}
+                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Working Directory
+                </label>
+                <input
+                  type="text"
+                  placeholder="/mnt/agentic-app"
+                  value={workingDirectory}
+                  onChange={(e) => setWorkingDirectory(e.target.value)}
+                  className="w-full bg-[#090d16] border border-[#1e293b] rounded-lg px-4 py-2.5 text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
@@ -675,6 +751,19 @@ export function MCPServerForm() {
             <div className="p-3 bg-emerald-950/50 border border-emerald-800 rounded-lg text-emerald-300 text-xs flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               <span>Successfully connected to MCP Server! Discovered {discoveredTools.length} tools.</span>
+            </div>
+          )}
+
+          {discoveryWarning && (
+            <div className="p-3 bg-amber-950/50 border border-amber-800 rounded-lg text-amber-300 text-xs flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{discoveryWarning}</span>
+            </div>
+          )}
+
+          {discoveryMessage && !discoverySuccess && !discoveryWarning && (
+            <div className="p-3 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 text-xs">
+              {discoveryMessage}
             </div>
           )}
 

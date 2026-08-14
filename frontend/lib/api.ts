@@ -1,4 +1,4 @@
-import { Agent, Skill, MCPTool, MCPServer, Workflow, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool, OAuthInitRequest, OAuthInitResponse, OAuthCallbackRequest, OAuthTokens } from './types';
+import { Agent, Skill, MCPTool, MCPServer, Workflow, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool, OAuthInitRequest, OAuthInitResponse, OAuthCallbackRequest, OAuthTokens, MCPDiscoveryResult } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -57,6 +57,9 @@ export const api = {
     name: string;
     description?: string;
     server_url: string;
+    command?: string;
+    args?: string[];
+    working_directory?: string;
     transport_type: string;
     auth_type: string;
     auth_config: any;
@@ -67,7 +70,7 @@ export const api = {
   }) => fetchJSON<{ message?: string; server?: MCPServer } | MCPServer>('/mcp/servers', { method: 'POST', body: JSON.stringify(data) }),
   deleteMCPServer: (id: string) => fetchJSON<{ message: string }>(`/mcp/servers/${id}`, { method: 'DELETE' }),
   discoverMCPTools: (data: DiscoverToolsRequest) =>
-    fetchJSON<{ status: string; tools: DiscoveredTool[] }>('/mcp/servers/discover', {
+    fetchJSON<MCPDiscoveryResult>('/mcp/servers/discover', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

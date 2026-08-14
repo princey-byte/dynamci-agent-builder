@@ -2,6 +2,16 @@ export type RoleType = 'supervisor' | 'worker' | 'evaluator';
 export type FileType = 'markdown' | 'text';
 export type TransportType = 'sse' | 'stdio';
 export type AuthType = 'none' | 'bearer' | 'api_key' | 'custom_headers' | 'env_vars' | 'oauth2';
+export type MCPConnectionStatus = 'REGISTERED' | 'CONNECTED' | 'ERROR';
+export type MCPDiscoveryStatus = 'connected' | 'empty' | 'error';
+
+export interface MCPDiscoveryResult {
+  status: MCPDiscoveryStatus;
+  message: string;
+  protocol_version?: string;
+  session_id?: string;
+  tools: DiscoveredTool[];
+}
 
 export interface OAuthTokens {
   access_token: string;
@@ -35,6 +45,9 @@ export interface MCPTool {
   name: string;
   description: string;
   server_url: string;
+  command?: string;
+  args?: string[];
+  working_directory?: string;
   transport_type: TransportType;
   input_schema: any;
   created_at: string;
@@ -45,6 +58,9 @@ export interface MCPServer {
   name: string;
   description: string;
   server_url: string;
+  command?: string;
+  args?: string[];
+  working_directory?: string;
   transport_type: TransportType;
   auth_type: AuthType;
   auth_config: AuthConfig;
@@ -52,7 +68,10 @@ export interface MCPServer {
   oauth_client_secret?: string;
   oauth_scopes?: string;
   oauth_tokens?: OAuthTokens;
-  status: string;
+  status: MCPConnectionStatus;
+  last_connection_status?: string;
+  last_connection_error?: string;
+  last_discovered_at?: string;
   created_at: string;
   updated_at: string;
   tools?: MCPTool[];
@@ -67,6 +86,9 @@ export interface DiscoveredTool {
 
 export interface DiscoverToolsRequest {
   server_url: string;
+  command?: string;
+  args?: string[];
+  working_directory?: string;
   transport_type: TransportType;
   auth_type: AuthType;
   auth_config: AuthConfig;

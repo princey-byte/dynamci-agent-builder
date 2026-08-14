@@ -6,7 +6,7 @@ import { api } from '../../../lib/api';
 import { MCPServer } from '../../../lib/types';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { MCPServerCard } from '../../../components/mcp/MCPServerCard';
-import { Wrench, Plus, RefreshCw, Server } from 'lucide-react';
+import { Plus, RefreshCw, Server } from 'lucide-react';
 
 export default function MCPToolsPage() {
   const [servers, setServers] = useState<MCPServer[]>([]);
@@ -72,7 +72,7 @@ export default function MCPToolsPage() {
         <EmptyState
           icon={Server}
           title="No MCP Servers Registered"
-          description="Connect to SSE endpoints or Stdio commands with Bearer Token, API Key, or Header Auth and discover tools dynamically."
+          description="Connect to Streamable HTTP endpoints or local stdio commands such as npx with args and environment variables."
           actionHref="/mcp-tools/register"
           actionLabel="Register MCP Server & Discover Tools"
         />

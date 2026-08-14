@@ -46,21 +46,53 @@ func (r *MCPServerRepository) Create(ctx context.Context, req models.CreateMCPSe
 	} else {
 		oauthTokensBytes = []byte("{}")
 	}
+	argsBytes, err := json.Marshal(req.Args)
+	if err != nil {
+		argsBytes = []byte("[]")
+	}
+	serverURL := req.ServerURL
+	if transport == models.TransportStdio && serverURL == "" {
+		serverURL = req.Command
+	}
+	status := models.MCPConnectionStatusRegistered
+	lastConnectionStatus := "registered"
+	lastConnectionError := ""
+	if len(req.ImportTools) > 0 {
+		status = models.MCPConnectionStatusConnected
+		lastConnectionStatus = "connected"
+	}
+	var lastDiscoveredAt *time.Time
+	if len(req.ImportTools) > 0 {
+		lastDiscoveredAt = &now
+	}
 
 	query := `
-		INSERT INTO mcp_servers (id, name, description, server_url, transport_type, auth_type, auth_config, oauth_client_id, oauth_client_secret, oauth_scopes, oauth_tokens, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'ACTIVE', $12, $13)
-		RETURNING id, name, description, server_url, transport_type, auth_type, auth_config, COALESCE(oauth_client_id, ''), COALESCE(oauth_client_secret, ''), COALESCE(oauth_scopes, ''), oauth_tokens, status, created_at, updated_at
+		INSERT INTO mcp_servers (
+			id, name, description, server_url, command, args, working_directory,
+			transport_type, auth_type, auth_config, oauth_client_id, oauth_client_secret,
+			oauth_scopes, oauth_tokens, status, last_connection_status, last_connection_error,
+			last_discovered_at, created_at, updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		RETURNING id, name, description, server_url, command, args, working_directory, transport_type, auth_type, auth_config, COALESCE(oauth_client_id, ''), COALESCE(oauth_client_secret, ''), COALESCE(oauth_scopes, ''), oauth_tokens, status, COALESCE(last_connection_status, ''), COALESCE(last_connection_error, ''), last_discovered_at, created_at, updated_at
 	`
 	var s models.MCPServer
-	var rawAuth, rawOAuthTokens []byte
-	err = r.pool.QueryRow(ctx, query, serverID, req.Name, req.Description, req.ServerURL, transport, authType, authBytes, req.OAuthClientID, req.OAuthClientSecret, req.OAuthScopes, oauthTokensBytes, now, now).Scan(
-		&s.ID, &s.Name, &s.Description, &s.ServerURL, &s.TransportType, &s.AuthType, &rawAuth, &s.OAuthClientID, &s.OAuthClientSecret, &s.OAuthScopes, &rawOAuthTokens, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+	var rawAuth, rawOAuthTokens, rawArgs []byte
+	err = r.pool.QueryRow(ctx, query,
+		serverID, req.Name, req.Description, serverURL, req.Command, argsBytes, req.WorkingDirectory,
+		transport, authType, authBytes, req.OAuthClientID, req.OAuthClientSecret, req.OAuthScopes,
+		oauthTokensBytes, status, lastConnectionStatus, lastConnectionError, lastDiscoveredAt, now, now,
+	).Scan(
+		&s.ID, &s.Name, &s.Description, &s.ServerURL, &s.Command, &rawArgs, &s.WorkingDirectory,
+		&s.TransportType, &s.AuthType, &rawAuth, &s.OAuthClientID, &s.OAuthClientSecret,
+		&s.OAuthScopes, &rawOAuthTokens, &s.Status, &s.LastConnectionStatus,
+		&s.LastConnectionError, &s.LastDiscoveredAt, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP server: %w", err)
 	}
 
+	_ = json.Unmarshal(rawArgs, &s.Args)
 	_ = json.Unmarshal(rawAuth, &s.AuthConfig)
 	if len(rawOAuthTokens) > 0 {
 		var oauthTokens models.OAuthTokens
@@ -73,16 +105,17 @@ func (r *MCPServerRepository) Create(ctx context.Context, req models.CreateMCPSe
 	// Import and link discovered tools
 	for _, tool := range req.ImportTools {
 		tID := uuid.New()
+		toolArgsBytes, _ := json.Marshal(s.Args)
 		tQuery := `
-			INSERT INTO mcp_tools (id, server_id, name, description, server_url, transport_type, input_schema, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			INSERT INTO mcp_tools (id, server_id, name, description, server_url, command, args, working_directory, transport_type, input_schema, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 			ON CONFLICT DO NOTHING
 		`
 		desc := tool.Description
 		if desc == "" {
 			desc = fmt.Sprintf("Tool %s from server %s", tool.Name, s.Name)
 		}
-		if _, execErr := r.pool.Exec(ctx, tQuery, tID, s.ID, tool.Name, desc, s.ServerURL, s.TransportType, tool.InputSchema, now); execErr != nil {
+		if _, execErr := r.pool.Exec(ctx, tQuery, tID, s.ID, tool.Name, desc, s.ServerURL, s.Command, toolArgsBytes, s.WorkingDirectory, s.TransportType, tool.InputSchema, now); execErr != nil {
 			log.Printf("Warning: Tool insertion skipped or failed: %v", execErr)
 		}
 	}
@@ -91,16 +124,20 @@ func (r *MCPServerRepository) Create(ctx context.Context, req models.CreateMCPSe
 }
 
 func (r *MCPServerRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.MCPServer, error) {
-	query := `SELECT id, name, COALESCE(description, ''), server_url, transport_type, auth_type, auth_config, COALESCE(oauth_client_id, ''), COALESCE(oauth_client_secret, ''), COALESCE(oauth_scopes, ''), oauth_tokens, status, created_at, updated_at FROM mcp_servers WHERE id = $1`
+	query := `SELECT id, name, COALESCE(description, ''), server_url, COALESCE(command, ''), COALESCE(args, '[]'), COALESCE(working_directory, ''), transport_type, auth_type, auth_config, COALESCE(oauth_client_id, ''), COALESCE(oauth_client_secret, ''), COALESCE(oauth_scopes, ''), oauth_tokens, status, COALESCE(last_connection_status, ''), COALESCE(last_connection_error, ''), last_discovered_at, created_at, updated_at FROM mcp_servers WHERE id = $1`
 	var s models.MCPServer
-	var rawAuth, rawOAuthTokens []byte
+	var rawAuth, rawOAuthTokens, rawArgs []byte
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&s.ID, &s.Name, &s.Description, &s.ServerURL, &s.TransportType, &s.AuthType, &rawAuth, &s.OAuthClientID, &s.OAuthClientSecret, &s.OAuthScopes, &rawOAuthTokens, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.Name, &s.Description, &s.ServerURL, &s.Command, &rawArgs, &s.WorkingDirectory,
+		&s.TransportType, &s.AuthType, &rawAuth, &s.OAuthClientID, &s.OAuthClientSecret,
+		&s.OAuthScopes, &rawOAuthTokens, &s.Status, &s.LastConnectionStatus,
+		&s.LastConnectionError, &s.LastDiscoveredAt, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("MCP server not found: %w", err)
 	}
 
+	_ = json.Unmarshal(rawArgs, &s.Args)
 	_ = json.Unmarshal(rawAuth, &s.AuthConfig)
 	if len(rawOAuthTokens) > 0 {
 		var oauthTokens models.OAuthTokens
@@ -111,14 +148,16 @@ func (r *MCPServerRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 	}
 
 	// Load tools linked to server
-	toolsQuery := `SELECT id, server_id, name, description, server_url, transport_type, input_schema, created_at FROM mcp_tools WHERE server_id = $1 ORDER BY name ASC`
+	toolsQuery := `SELECT id, server_id, name, description, server_url, COALESCE(command, ''), COALESCE(args, '[]'), COALESCE(working_directory, ''), transport_type, input_schema, created_at FROM mcp_tools WHERE server_id = $1 ORDER BY name ASC`
 	rows, err := r.pool.Query(ctx, toolsQuery, s.ID)
 	if err == nil {
 		defer rows.Close()
 		var tools []models.MCPTool
 		for rows.Next() {
 			var t models.MCPTool
-			if scanErr := rows.Scan(&t.ID, &t.ServerID, &t.Name, &t.Description, &t.ServerURL, &t.TransportType, &t.InputSchema, &t.CreatedAt); scanErr == nil {
+			var rawToolArgs []byte
+			if scanErr := rows.Scan(&t.ID, &t.ServerID, &t.Name, &t.Description, &t.ServerURL, &t.Command, &rawToolArgs, &t.WorkingDirectory, &t.TransportType, &t.InputSchema, &t.CreatedAt); scanErr == nil {
+				_ = json.Unmarshal(rawToolArgs, &t.Args)
 				tools = append(tools, t)
 			}
 		}
@@ -129,7 +168,7 @@ func (r *MCPServerRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 }
 
 func (r *MCPServerRepository) List(ctx context.Context) ([]models.MCPServer, error) {
-	query := `SELECT id, name, COALESCE(description, ''), server_url, transport_type, auth_type, auth_config, COALESCE(oauth_client_id, ''), COALESCE(oauth_client_secret, ''), COALESCE(oauth_scopes, ''), oauth_tokens, status, created_at, updated_at FROM mcp_servers ORDER BY created_at DESC`
+	query := `SELECT id, name, COALESCE(description, ''), server_url, COALESCE(command, ''), COALESCE(args, '[]'), COALESCE(working_directory, ''), transport_type, auth_type, auth_config, COALESCE(oauth_client_id, ''), COALESCE(oauth_client_secret, ''), COALESCE(oauth_scopes, ''), oauth_tokens, status, COALESCE(last_connection_status, ''), COALESCE(last_connection_error, ''), last_discovered_at, created_at, updated_at FROM mcp_servers ORDER BY created_at DESC`
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
 		return []models.MCPServer{}, nil
@@ -138,8 +177,14 @@ func (r *MCPServerRepository) List(ctx context.Context) ([]models.MCPServer, err
 	var servers []models.MCPServer
 	for rows.Next() {
 		var s models.MCPServer
-		var rawAuth, rawOAuthTokens []byte
-		if err := rows.Scan(&s.ID, &s.Name, &s.Description, &s.ServerURL, &s.TransportType, &s.AuthType, &rawAuth, &s.OAuthClientID, &s.OAuthClientSecret, &s.OAuthScopes, &rawOAuthTokens, &s.Status, &s.CreatedAt, &s.UpdatedAt); err == nil {
+		var rawAuth, rawOAuthTokens, rawArgs []byte
+		if err := rows.Scan(
+			&s.ID, &s.Name, &s.Description, &s.ServerURL, &s.Command, &rawArgs, &s.WorkingDirectory,
+			&s.TransportType, &s.AuthType, &rawAuth, &s.OAuthClientID, &s.OAuthClientSecret,
+			&s.OAuthScopes, &rawOAuthTokens, &s.Status, &s.LastConnectionStatus,
+			&s.LastConnectionError, &s.LastDiscoveredAt, &s.CreatedAt, &s.UpdatedAt,
+		); err == nil {
+			_ = json.Unmarshal(rawArgs, &s.Args)
 			_ = json.Unmarshal(rawAuth, &s.AuthConfig)
 			if len(rawOAuthTokens) > 0 {
 				var oauthTokens models.OAuthTokens
@@ -155,13 +200,15 @@ func (r *MCPServerRepository) List(ctx context.Context) ([]models.MCPServer, err
 
 	// Load tools for each server
 	for i := range servers {
-		toolsQuery := `SELECT id, server_id, name, description, server_url, transport_type, input_schema, created_at FROM mcp_tools WHERE server_id = $1 ORDER BY name ASC`
+		toolsQuery := `SELECT id, server_id, name, description, server_url, COALESCE(command, ''), COALESCE(args, '[]'), COALESCE(working_directory, ''), transport_type, input_schema, created_at FROM mcp_tools WHERE server_id = $1 ORDER BY name ASC`
 		tRows, tErr := r.pool.Query(ctx, toolsQuery, servers[i].ID)
 		if tErr == nil {
 			var tools []models.MCPTool
 			for tRows.Next() {
 				var t models.MCPTool
-				if scanErr := tRows.Scan(&t.ID, &t.ServerID, &t.Name, &t.Description, &t.ServerURL, &t.TransportType, &t.InputSchema, &t.CreatedAt); scanErr == nil {
+				var rawToolArgs []byte
+				if scanErr := tRows.Scan(&t.ID, &t.ServerID, &t.Name, &t.Description, &t.ServerURL, &t.Command, &rawToolArgs, &t.WorkingDirectory, &t.TransportType, &t.InputSchema, &t.CreatedAt); scanErr == nil {
+					_ = json.Unmarshal(rawToolArgs, &t.Args)
 					tools = append(tools, t)
 				}
 			}

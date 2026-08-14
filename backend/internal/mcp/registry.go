@@ -2,8 +2,10 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
 	"agentic-platform/backend/internal/llm"
+	"agentic-platform/backend/internal/mcp/transport"
 	"agentic-platform/backend/internal/models"
 )
 
@@ -29,7 +31,25 @@ func (r *ToolRegistry) RegisterTool(tool models.MCPTool) MCPClient {
 	}
 
 	if tool.TransportType == models.TransportStdio {
-		client = NewStdioMCPClient(tool.ServerURL, tool.Name, tool.InputSchema, authType, authConfig)
+		command := tool.Command
+		args := tool.Args
+		workingDirectory := tool.WorkingDirectory
+		if command == "" && tool.Server != nil {
+			command = tool.Server.Command
+			args = tool.Server.Args
+			workingDirectory = tool.Server.WorkingDirectory
+		}
+		if command == "" {
+			command = tool.ServerURL
+		}
+		client = transport.NewStdioClient(transport.StdioConfig{
+			Command:          command,
+			Args:             args,
+			WorkingDirectory: workingDirectory,
+			ToolName:         tool.Name,
+			Schema:           tool.InputSchema,
+			AuthConfig:       authConfig,
+		})
 	} else {
 		client = NewSSEMCPClient(tool.ServerURL, tool.Name, tool.InputSchema, authType, authConfig)
 	}
@@ -52,10 +72,5 @@ func (r *ToolRegistry) ExecuteTool(ctx context.Context, toolName string, args ma
 	if client, exists := r.clients[toolName]; exists {
 		return client.CallTool(ctx, toolName, args)
 	}
-	return map[string]interface{}{
-		"status":  "success",
-		"tool":    toolName,
-		"args":    args,
-		"message": "Tool executed via registry.",
-	}, nil
+	return nil, fmt.Errorf("MCP tool %q is not registered in the runtime registry", toolName)
 }

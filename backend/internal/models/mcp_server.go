@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,30 @@ const (
 	AuthTypeEnvVars       AuthType = "env_vars"
 	AuthTypeOAuth         AuthType = "oauth2"
 )
+
+type MCPConnectionStatus string
+
+const (
+	MCPConnectionStatusRegistered MCPConnectionStatus = "REGISTERED"
+	MCPConnectionStatusConnected  MCPConnectionStatus = "CONNECTED"
+	MCPConnectionStatusError      MCPConnectionStatus = "ERROR"
+)
+
+type MCPDiscoveryStatus string
+
+const (
+	MCPDiscoveryStatusConnected MCPDiscoveryStatus = "connected"
+	MCPDiscoveryStatusEmpty     MCPDiscoveryStatus = "empty"
+	MCPDiscoveryStatusError     MCPDiscoveryStatus = "error"
+)
+
+type MCPDiscoveryResult struct {
+	Status          MCPDiscoveryStatus `json:"status"`
+	Message         string             `json:"message"`
+	ProtocolVersion string             `json:"protocol_version,omitempty"`
+	SessionID       string             `json:"session_id,omitempty"`
+	Tools           []DiscoveredTool   `json:"tools"`
+}
 
 type AuthConfig struct {
 	BearerToken       string            `json:"bearer_token,omitempty"`
@@ -36,27 +61,36 @@ type OAuthTokens struct {
 }
 
 type MCPServer struct {
-	ID                uuid.UUID     `json:"id"`
-	Name              string        `json:"name"`
-	Description       string        `json:"description"`
-	ServerURL         string        `json:"server_url"`
-	TransportType     TransportType `json:"transport_type"`
-	AuthType          AuthType      `json:"auth_type"`
-	AuthConfig        AuthConfig    `json:"auth_config"`
-	OAuthClientID     string        `json:"oauth_client_id,omitempty"`
-	OAuthClientSecret string        `json:"oauth_client_secret,omitempty"`
-	OAuthScopes       string        `json:"oauth_scopes,omitempty"`
-	OAuthTokens       *OAuthTokens  `json:"oauth_tokens,omitempty"`
-	Status            string        `json:"status"`
-	CreatedAt         time.Time     `json:"created_at"`
-	UpdatedAt         time.Time     `json:"updated_at"`
-	Tools             []MCPTool     `json:"tools,omitempty"`
+	ID                   uuid.UUID           `json:"id"`
+	Name                 string              `json:"name"`
+	Description          string              `json:"description"`
+	ServerURL            string              `json:"server_url"`
+	Command              string              `json:"command,omitempty"`
+	Args                 []string            `json:"args,omitempty"`
+	WorkingDirectory     string              `json:"working_directory,omitempty"`
+	TransportType        TransportType       `json:"transport_type"`
+	AuthType             AuthType            `json:"auth_type"`
+	AuthConfig           AuthConfig          `json:"auth_config"`
+	OAuthClientID        string              `json:"oauth_client_id,omitempty"`
+	OAuthClientSecret    string              `json:"oauth_client_secret,omitempty"`
+	OAuthScopes          string              `json:"oauth_scopes,omitempty"`
+	OAuthTokens          *OAuthTokens        `json:"oauth_tokens,omitempty"`
+	Status               MCPConnectionStatus `json:"status"`
+	LastConnectionStatus string              `json:"last_connection_status,omitempty"`
+	LastConnectionError  string              `json:"last_connection_error,omitempty"`
+	LastDiscoveredAt     *time.Time          `json:"last_discovered_at,omitempty"`
+	CreatedAt            time.Time           `json:"created_at"`
+	UpdatedAt            time.Time           `json:"updated_at"`
+	Tools                []MCPTool           `json:"tools,omitempty"`
 }
 
 type CreateMCPServerRequest struct {
 	Name              string           `json:"name" binding:"required"`
 	Description       string           `json:"description"`
-	ServerURL         string           `json:"server_url" binding:"required"`
+	ServerURL         string           `json:"server_url"`
+	Command           string           `json:"command,omitempty"`
+	Args              []string         `json:"args,omitempty"`
+	WorkingDirectory  string           `json:"working_directory,omitempty"`
 	TransportType     TransportType    `json:"transport_type"`
 	AuthType          AuthType         `json:"auth_type"`
 	AuthConfig        AuthConfig       `json:"auth_config"`
@@ -67,10 +101,33 @@ type CreateMCPServerRequest struct {
 }
 
 type DiscoverToolsRequest struct {
-	ServerURL     string        `json:"server_url" binding:"required"`
-	TransportType TransportType `json:"transport_type"`
-	AuthType      AuthType      `json:"auth_type"`
-	AuthConfig    AuthConfig    `json:"auth_config"`
+	ServerURL        string        `json:"server_url"`
+	Command          string        `json:"command,omitempty"`
+	Args             []string      `json:"args,omitempty"`
+	WorkingDirectory string        `json:"working_directory,omitempty"`
+	TransportType    TransportType `json:"transport_type"`
+	AuthType         AuthType      `json:"auth_type"`
+	AuthConfig       AuthConfig    `json:"auth_config"`
+}
+
+func (r DiscoverToolsRequest) EndpointOrCommand() string {
+	if r.TransportType == TransportStdio {
+		return r.Command
+	}
+	return r.ServerURL
+}
+
+func (r DiscoverToolsRequest) ValidateConnectionTarget() error {
+	if r.TransportType == TransportStdio {
+		if r.Command == "" {
+			return fmt.Errorf("command is required for stdio MCP discovery")
+		}
+		return nil
+	}
+	if r.ServerURL == "" {
+		return fmt.Errorf("server_url is required for HTTP MCP discovery")
+	}
+	return nil
 }
 
 type DiscoveredTool struct {

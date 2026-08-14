@@ -89,8 +89,8 @@ func (r *AgentRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Ag
 	// Fetch attached MCP tools with parent MCP Server auth configuration
 	toolsQuery := `
 		SELECT 
-			t.id, t.server_id, t.name, t.description, t.server_url, t.transport_type, t.input_schema, t.created_at,
-			s.id, s.name, COALESCE(s.description, ''), s.server_url, s.transport_type, s.auth_type, s.auth_config, 
+			t.id, t.server_id, t.name, t.description, t.server_url, COALESCE(t.command, ''), COALESCE(t.args, '[]'), COALESCE(t.working_directory, ''), t.transport_type, t.input_schema, t.created_at,
+			s.id, s.name, COALESCE(s.description, ''), s.server_url, COALESCE(s.command, ''), COALESCE(s.args, '[]'), COALESCE(s.working_directory, ''), s.transport_type, s.auth_type, s.auth_config, 
 			COALESCE(s.oauth_client_id, ''), COALESCE(s.oauth_client_secret, ''), COALESCE(s.oauth_scopes, ''), s.oauth_tokens, s.status, s.created_at, s.updated_at
 		FROM mcp_tools t
 		JOIN agent_mcp_tools amt ON t.id = amt.mcp_tool_id
@@ -104,33 +104,37 @@ func (r *AgentRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Ag
 		for tRows.Next() {
 			var t models.MCPTool
 			var sID *uuid.UUID
-			var sName, sDesc, sURL, sStatus string
+			var sName, sDesc, sURL, sCommand, sWorkingDirectory, sStatus string
 			var sTransport models.TransportType
 			var sAuthType models.AuthType
-			var rawAuth, rawOAuthTokens []byte
+			var rawToolArgs, rawServerArgs, rawAuth, rawOAuthTokens []byte
 			var clientID, clientSecret, scopes string
 			var sCreatedAt, sUpdatedAt time.Time
 
 			if scanErr := tRows.Scan(
-				&t.ID, &t.ServerID, &t.Name, &t.Description, &t.ServerURL, &t.TransportType, &t.InputSchema, &t.CreatedAt,
-				&sID, &sName, &sDesc, &sURL, &sTransport, &sAuthType, &rawAuth,
+				&t.ID, &t.ServerID, &t.Name, &t.Description, &t.ServerURL, &t.Command, &rawToolArgs, &t.WorkingDirectory, &t.TransportType, &t.InputSchema, &t.CreatedAt,
+				&sID, &sName, &sDesc, &sURL, &sCommand, &rawServerArgs, &sWorkingDirectory, &sTransport, &sAuthType, &rawAuth,
 				&clientID, &clientSecret, &scopes, &rawOAuthTokens, &sStatus, &sCreatedAt, &sUpdatedAt,
 			); scanErr == nil {
+				_ = json.Unmarshal(rawToolArgs, &t.Args)
 				if sID != nil {
 					srv := models.MCPServer{
 						ID:                *sID,
 						Name:              sName,
 						Description:       sDesc,
 						ServerURL:         sURL,
+						Command:           sCommand,
+						WorkingDirectory:  sWorkingDirectory,
 						TransportType:     sTransport,
 						AuthType:          sAuthType,
 						OAuthClientID:     clientID,
 						OAuthClientSecret: clientSecret,
 						OAuthScopes:       scopes,
-						Status:            sStatus,
+						Status:            models.MCPConnectionStatus(sStatus),
 						CreatedAt:         sCreatedAt,
 						UpdatedAt:         sUpdatedAt,
 					}
+					_ = json.Unmarshal(rawServerArgs, &srv.Args)
 					_ = json.Unmarshal(rawAuth, &srv.AuthConfig)
 					if len(rawOAuthTokens) > 0 {
 						var oauthTokens models.OAuthTokens
