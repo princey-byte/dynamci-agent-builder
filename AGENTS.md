@@ -1,135 +1,138 @@
-Acts as the **master technical specification** for developers and AI coding assistants (e.g. Cursor, Claude Code, GitHub Copilot).
-- **Core Requirements**: Details backend Go requirements, Next.js frontend setup, and PostgreSQL database migrations.
-- **Database Schema**: Full PostgreSQL DDL for agents, skills, MCP tools, workflows, execution sessions, and session logs.
-- **Direct References**: Directly links to `PRODUCT.md` for business logic/use cases and `DESIGN.md` for component rules.
+# AGENTS.md - Agentic Workflow Platform Guide
 
-```markdown
-# AGENTS.md — System Implementation & Core Requirements
+Use this file as the first stop for AI coding agents working in this repository. Keep it concise, actionable, and linked to canonical docs instead of duplicating them.
 
-This document outlines the core requirements, architecture, and instructions for AI agents and developers implementing the **Agentic Workflow Platform**.
+## Project Purpose
 
----
+The Agentic Workflow Platform is a full-stack system for creating and running hierarchical AI agent workflows. Users can define supervisor and worker agents, attach Markdown/text skills, connect MCP tools and servers, build workflows, execute them, and inspect streamed execution logs.
 
-## 1. System Overview & Tech Stack
+## Local Agent Rules And Skills
 
-The platform allows users to create, configure, and run hierarchical AI agents with custom personas, skills (Markdown/Text files), MCP tools, multi-LLM support, persistent session storage, and real-time streaming cognition via Server-Sent Events (SSE).
+Before developing a new feature, check the local agent resources:
 
-### Technology Stack
-- **Backend Engine**: Go (Golang 1.22+)
-- **Frontend Application**: Next.js 14+ (App Router, TypeScript, Tailwind CSS)
-- **Database & Storage**: PostgreSQL 16+
-- **Tooling Protocol**: Model Context Protocol (MCP)
-- **Streaming Protocol**: Server-Sent Events (SSE) via HTTP
+- Rules: [.agents/rules/guidelines.md](.agents/rules/guidelines.md) contains project coding standards for the Go backend and TypeScript/React frontend.
+- Skills: [.agents/skills](.agents/skills) contains workflows that must be used when relevant. Load the specific `SKILL.md` before acting.
 
----
+Commonly relevant skills include:
 
-## 2. References & Project Standards
+- `brainstorming` for feature shaping or behavior changes before implementation.
+- `test-driven-development` for feature and bug-fix implementation.
+- `systematic-debugging` for bugs, failing tests, or unexpected behavior.
+- `frontend-design`, `impeccable`, `nextjs`, `shadcn`, and `vercel-react-best-practices` for frontend work.
+- `frontend-api-integration` for typed frontend API calls to the Go backend.
+- `verification-before-completion` before claiming work is complete.
+- `requesting-code-review` before major merges or larger feature completion.
 
-Before implementing features or modifying code, refer to these foundational documents:
-- 📖 **[PRODUCT.md](./PRODUCT.md)**: Product vision, user personas, real-world use cases, and functional workflows.
-- 🎨 **[DESIGN.md](./DESIGN.md)**: UI/UX design system, color tokens, typography, component rules, and interaction patterns.
+Prefer adding or updating a focused skill when a repeated workflow cannot be captured cleanly in this root guide.
 
----
+## Repository Shape
 
-## 3. Core Functional Requirements
+- [backend](backend): Go backend engine using Gin, pgx/PostgreSQL, embedded migrations, repositories, handlers, MCP integration, LLM providers, and workflow execution.
+- [frontend](frontend): Next.js App Router frontend using React 19, TypeScript, Tailwind CSS 4, Base UI/shadcn-style components, lucide icons, and Vitest.
+- [backend/migrations](backend/migrations): SQL migration source files. Backend also embeds migration copies under `backend/internal/db/migrations_embedded`.
+- [docs](docs): focused implementation notes and historical plans. Link these rather than copying their content.
 
-### 3.1 Agent & Skill Management
-- **Agent Customization**: CRUD endpoints for agents (`name`, `persona`, `model_provider`, `model_name`, `temperature`, `role_type`).
-- **Skill Aggregation**: Support uploading `.md` and `.txt` files. System must combine base persona prompts with active skill documents into a single system context window.
-- **Multi-LLM Integration**: Implement an abstract interface (`LLMProvider`) supporting OpenAI, Anthropic Claude, Google Gemini, Ollama, and custom endpoints.
+## Backend Implementation Status
 
-### 3.2 Tool Integration (Model Context Protocol)
-- Registry to add external MCP servers (Stdio or SSE transport).
-- Dynamically parse MCP tool signatures and expose them as JSON Schema tools to LLM drivers.
+The backend entrypoint is [backend/cmd/server/main.go](backend/cmd/server/main.go). It loads `.env` when present, reads [backend/config.json](backend/config.json), initializes PostgreSQL, runs embedded migrations, constructs repositories, creates the MCP tool registry, and registers API routes.
 
-### 3.3 Hierarchical Workflow Engine
-- Establish parent-child agent topologies (Supervisor -> Workers).
-- **Supervisor Routing**: Supervisor agent evaluates incoming tasks, delegates subtasks to Worker agents, and aggregates results.
+Implemented backend areas:
 
-### 3.4 Execution Persistence & SSE Streaming
-- Real-time SSE endpoint (`GET /api/v1/workflows/{id}/execute/stream`).
-- Stream event types: `AGENT_THOUGHT`, `AGENT_DELEGATION`, `TOOL_CALL`, `TOOL_RESULT`, `WORKFLOW_COMPLETE`, `ERROR`.
-- Save all step-by-step trace logs to PostgreSQL (`execution_sessions` and `session_logs`).
+- Agents: CRUD, skill attachment, and MCP tool attachment.
+- Skills: JSON creation and multipart upload for Markdown/text skill files.
+- MCP servers: create/list/get/delete, tool discovery, OAuth callback flow, connection state, stdio transport, and HTTP/SSE transport behavior.
+- MCP tools: legacy direct register/list/get/delete endpoints.
+- Workflows: create/list/get/delete plus execution over SSE.
+- Sessions: persisted execution sessions and step logs.
+- Engine: context aggregation, supervisor routing, worker execution, MCP tool calls, tool-result follow-up, orchestration, and SSE event streaming.
+- LLM providers: provider abstraction with OpenAI, Azure OpenAI, Anthropic/Claude, and Gemini factory support.
 
----
+Important backend files:
 
-## 4. Database Schema Quick Reference (PostgreSQL)
+- API routes: [backend/internal/api/routes.go](backend/internal/api/routes.go)
+- Models and validation: [backend/internal/models](backend/internal/models)
+- Repositories: [backend/internal/repository](backend/internal/repository)
+- Workflow engine: [backend/internal/engine](backend/internal/engine)
+- MCP clients and registry: [backend/internal/mcp](backend/internal/mcp)
+- LLM providers: [backend/internal/llm](backend/internal/llm)
+- DB init and migration embedding: [backend/internal/db](backend/internal/db)
 
-```sql
-CREATE TABLE agents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    persona TEXT NOT NULL,
-    model_provider VARCHAR(100) NOT NULL DEFAULT 'openai',
-    model_name VARCHAR(100) NOT NULL DEFAULT 'gpt-4o',
-    temperature NUMERIC(3, 2) DEFAULT 0.20,
-    role_type VARCHAR(50) NOT NULL CHECK (role_type IN ('supervisor', 'worker', 'evaluator')),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+Backend commands, run from [backend](backend):
 
-CREATE TABLE skills (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title VARCHAR(255) NOT NULL,
-    content TEXT NOT NULL,
-    file_type VARCHAR(20) NOT NULL CHECK (file_type IN ('markdown', 'text')),
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+```bash
+go run ./cmd/server
+go test ./...
+go test ./internal/engine
+go test ./internal/mcp ./internal/mcp/transport
+go test ./internal/models
+```
 
-CREATE TABLE agent_skills (
-    agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-    skill_id UUID REFERENCES skills(id) ON DELETE CASCADE,
-    PRIMARY KEY (agent_id, skill_id)
-);
+Runtime notes:
 
-CREATE TABLE mcp_tools (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) UNIQUE NOT NULL,
-    description TEXT NOT NULL,
-    server_url TEXT NOT NULL,
-    input_schema JSONB NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+- Default backend port is `8080`.
+- PostgreSQL is configured through `server.database_url`; see [backend/config.example.json](backend/config.example.json).
+- Do not invent a separate migration command; migrations run during DB initialization.
 
-CREATE TABLE agent_mcp_tools (
-    agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-    mcp_tool_id UUID REFERENCES mcp_tools(id) ON DELETE CASCADE,
-    PRIMARY KEY (agent_id, mcp_tool_id)
-);
+## Frontend Implementation Status
 
-CREATE TABLE workflows (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    supervisor_agent_id UUID REFERENCES agents(id),
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+For any frontend changes or any kind of modification, or any kind of new pages or new module implementation use ".agents/skills/shadcn" skills and ui library from shadcn only 
 
-CREATE TABLE workflow_nodes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
-    parent_node_id UUID REFERENCES workflow_nodes(id),
-    agent_id UUID REFERENCES agents(id),
-    execution_order INT NOT NULL,
-    routing_condition TEXT
-);
+The frontend uses Next.js 16 and React 19. Respect [frontend/AGENTS.md](frontend/AGENTS.md): consult local Next docs in `frontend/node_modules/next/dist/docs/` before relying on older framework assumptions.
 
-CREATE TABLE execution_sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workflow_id UUID REFERENCES workflows(id),
-    status VARCHAR(50) NOT NULL DEFAULT 'RUNNING',
-    input_query TEXT NOT NULL,
-    final_output TEXT,
-    started_at TIMESTAMPTZ DEFAULT NOW(),
-    completed_at TIMESTAMPTZ
-);
+Implemented frontend areas:
 
-CREATE TABLE session_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID REFERENCES execution_sessions(id) ON DELETE CASCADE,
-    agent_id UUID REFERENCES agents(id),
-    step_number INT NOT NULL,
-    log_type VARCHAR(50) NOT NULL,
-    content JSONB NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+- App shell with persistent dashboard sidebar and content layout.
+- Agent list/create/edit screens.
+- Skill list/upload screens.
+- MCP tool and MCP server management screens, including OAuth callback handling.
+- Workflow list/create/builder/execute screens.
+- Session list/detail screens.
+- SSE workflow execution hook and real-time thought console components.
+- Shared API client, shared TypeScript types, reusable UI primitives, theme mode support, and design-token tests.
+
+Important frontend files:
+
+- API client: [frontend/lib/api.ts](frontend/lib/api.ts)
+- Shared types: [frontend/lib/types.ts](frontend/lib/types.ts)
+- SSE hook: [frontend/hooks/useWorkflowExecution.ts](frontend/hooks/useWorkflowExecution.ts)
+- App shell: [frontend/components/app-sidebar.tsx](frontend/components/app-sidebar.tsx)
+- Console rendering: [frontend/components/console](frontend/components/console)
+- Workflow builder: [frontend/components/workflows](frontend/components/workflows)
+- UI components: [frontend/components/ui](frontend/components/ui)
+
+Frontend commands, run from [frontend](frontend):
+
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run test
+npm run test:run
+```
+
+Runtime notes:
+
+- Frontend dev server defaults to `http://localhost:3000`.
+- API calls default to `http://localhost:8080/api/v1` unless `NEXT_PUBLIC_API_URL` is set.
+- Existing browser sessions may use a different port, such as `3001`, when `3000` is occupied.
+
+## Development Conventions
+
+- Follow [.agents/rules/guidelines.md](.agents/rules/guidelines.md) for naming, file organization, state handling, error handling, and backend struct patterns.
+- Keep edits scoped to the feature slice. Avoid broad refactors unless the feature requires them.
+- Link to existing docs instead of embedding long reference material in instruction files.
+- Preserve generated Next.js agent guidance in [frontend/AGENTS.md](frontend/AGENTS.md); Next may re-add it during development.
+- Use semantic frontend design tokens and existing UI primitives. The design-token audit rejects raw hex colors and raw Tailwind color families in migrated UI files.
+- Keep [backend/migrations](backend/migrations) and embedded migration files in sync when changing schema behavior.
+- Treat workflow execution as supervisor-led sequential delegation unless intentionally changing the engine model.
+- For MCP stdio servers, use command, args, optional working directory, and auth env vars. For HTTP/SSE MCP servers, use server URL plus headers/OAuth configuration.
+
+## Verification Expectations
+
+Run the narrowest relevant checks after edits:
+
+- Backend logic: `go test ./...` or a narrower package test from [backend](backend).
+- Frontend logic/UI: `npm run test:run`, `npm run lint`, or a targeted Vitest invocation from [frontend](frontend).
+- Full frontend confidence: `npm run build` from [frontend](frontend) when routing, server/client boundaries, or Next.js behavior changes.
+
+Before saying work is complete, use the `verification-before-completion` skill when relevant and report which checks passed or could not be run.
