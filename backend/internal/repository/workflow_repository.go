@@ -62,6 +62,9 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 		return nil, fmt.Errorf("failed to create workflow: %w", err)
 	}
 
+	// Map of agentID / clientNodeID -> created DB nodeID
+	nodeIDMap := make(map[string]uuid.UUID)
+
 	// Create nodes
 	for i, nodeReq := range req.Nodes {
 		agentID, parseErr := uuid.Parse(nodeReq.AgentID)
@@ -77,6 +80,12 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 		}
 
 		nodeID := uuid.New()
+		if nodeReq.ID != nil && *nodeReq.ID != "" {
+			if parsedID, pErr := uuid.Parse(*nodeReq.ID); pErr == nil {
+				nodeID = parsedID
+			}
+		}
+
 		execOrder := nodeReq.ExecutionOrder
 		if execOrder <= 0 {
 			execOrder = i + 1
@@ -87,6 +96,48 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 			VALUES ($1, $2, $3, $4, $5, $6)
 		`
 		_, _ = r.pool.Exec(ctx, nodeQuery, nodeID, wf.ID, parentNodeID, agentID, execOrder, nodeReq.RoutingCondition)
+
+		nodeIDMap[nodeID.String()] = nodeID
+		nodeIDMap[agentID.String()] = nodeID
+		if nodeReq.ID != nil {
+			nodeIDMap[*nodeReq.ID] = nodeID
+		}
+	}
+
+	// Create edges
+	for _, edgeReq := range req.Edges {
+		sourceID, srcFound := nodeIDMap[edgeReq.SourceNodeID]
+		if !srcFound {
+			if parsed, pErr := uuid.Parse(edgeReq.SourceNodeID); pErr == nil {
+				sourceID = parsed
+			} else {
+				continue
+			}
+		}
+
+		targetID, tgtFound := nodeIDMap[edgeReq.TargetNodeID]
+		if !tgtFound {
+			if parsed, pErr := uuid.Parse(edgeReq.TargetNodeID); pErr == nil {
+				targetID = parsed
+			} else {
+				continue
+			}
+		}
+
+		condType := edgeReq.ConditionType
+		if condType == "" {
+			condType = "always"
+		}
+
+		edgeQuery := `
+			INSERT INTO workflow_edges (id, workflow_id, source_node_id, target_node_id, condition_type, condition_expression, label, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (workflow_id, source_node_id, target_node_id) DO UPDATE
+			SET condition_type = EXCLUDED.condition_type,
+			    condition_expression = EXCLUDED.condition_expression,
+			    label = EXCLUDED.label
+		`
+		_, _ = r.pool.Exec(ctx, edgeQuery, uuid.New(), wf.ID, sourceID, targetID, condType, edgeReq.ConditionExpression, edgeReq.Label, now)
 	}
 
 	return r.GetByID(ctx, wf.ID)
@@ -125,6 +176,24 @@ func (r *WorkflowRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 		wf.Nodes = nodes
 	}
 
+	// Fetch edges
+	edgesQuery := `
+		SELECT id, workflow_id, source_node_id, target_node_id, condition_type, COALESCE(condition_expression, ''), COALESCE(label, ''), created_at
+		FROM workflow_edges WHERE workflow_id = $1 ORDER BY created_at ASC
+	`
+	edgeRows, edgeErr := r.pool.Query(ctx, edgesQuery, id)
+	if edgeErr == nil {
+		defer edgeRows.Close()
+		var edges []models.WorkflowEdge
+		for edgeRows.Next() {
+			var e models.WorkflowEdge
+			if scanErr := edgeRows.Scan(&e.ID, &e.WorkflowID, &e.SourceNodeID, &e.TargetNodeID, &e.ConditionType, &e.ConditionExpression, &e.Label, &e.CreatedAt); scanErr == nil {
+				edges = append(edges, e)
+			}
+		}
+		wf.Edges = edges
+	}
+
 	return &wf, nil
 }
 
@@ -144,6 +213,7 @@ func (r *WorkflowRepository) List(ctx context.Context) ([]models.Workflow, error
 			if full != nil {
 				wf.SupervisorAgent = full.SupervisorAgent
 				wf.Nodes = full.Nodes
+				wf.Edges = full.Edges
 			}
 			workflows = append(workflows, wf)
 		}

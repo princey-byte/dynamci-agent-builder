@@ -13,6 +13,7 @@ import (
 type SupervisorRouter struct {
 	aggregator  *ContextAggregator
 	workerExec  *WorkerExecutor
+	graphExec   *GraphExecutor
 	sessionRepo *repository.SessionRepository
 }
 
@@ -20,6 +21,7 @@ func NewSupervisorRouter(aggregator *ContextAggregator, workerExec *WorkerExecut
 	return &SupervisorRouter{
 		aggregator:  aggregator,
 		workerExec:  workerExec,
+		graphExec:   NewGraphExecutor(aggregator, workerExec, sessionRepo),
 		sessionRepo: sessionRepo,
 	}
 }
@@ -93,38 +95,13 @@ func (sr *SupervisorRouter) RouteAndExecute(
 	eventChan <- planMsg
 	_ = sr.sessionRepo.AppendLog(ctx, parseUUID(sessionID), &supervisor.ID, stepNum, string(models.EventAgentThought), planMsg.Payload)
 
-	// Execute worker nodes sequentially
-	var workerOutputs []string
-	for _, node := range workflow.Nodes {
-		if node.Agent == nil {
-			continue
+	// Execute via GraphExecutor
+	var workerOutputSummary string
+	if len(workflow.Nodes) > 0 {
+		workerOutputSummary, err = sr.graphExec.ExecuteDAG(ctx, workflow, query, sessionID, &stepNum, eventChan)
+		if err != nil {
+			return "", fmt.Errorf("DAG execution failed: %w", err)
 		}
-
-		worker := node.Agent
-
-		// Emit AGENT_DELEGATION
-		stepNum++
-		delegationMsg := models.StreamMessage{
-			Event:     models.EventDelegation,
-			SessionID: sessionID,
-			AgentName: supervisor.Name,
-			Step:      stepNum,
-			Payload: map[string]interface{}{
-				"from_agent":       supervisor.Name,
-				"to_agent":         worker.Name,
-				"task_description": fmt.Sprintf("Execute subtask for node #%d (Routing: '%s')", node.ExecutionOrder, node.RoutingCondition),
-			},
-		}
-		eventChan <- delegationMsg
-		_ = sr.sessionRepo.AppendLog(ctx, parseUUID(sessionID), &supervisor.ID, stepNum, string(models.EventDelegation), delegationMsg.Payload)
-
-		// Execute worker
-		wOutput, wErr := sr.workerExec.ExecuteWorker(ctx, worker, fmt.Sprintf("Overall query: %s. Subtask routing: %s", query, node.RoutingCondition), sessionID, &stepNum, eventChan)
-		if wErr != nil {
-			wOutput = fmt.Sprintf("[Worker %s execution note]: Completed subtask with default trace.", worker.Name)
-		}
-
-		workerOutputs = append(workerOutputs, fmt.Sprintf("### Output from %s:\n%s", worker.Name, wOutput))
 	}
 
 	// Final aggregation by Supervisor
@@ -142,8 +119,8 @@ func (sr *SupervisorRouter) RouteAndExecute(
 	_ = sr.sessionRepo.AppendLog(ctx, parseUUID(sessionID), &supervisor.ID, stepNum, string(models.EventAgentThought), aggThoughtMsg.Payload)
 
 	var finalOutput string
-	if len(workerOutputs) > 0 {
-		finalOutput = fmt.Sprintf("# Workflow Execution Summary\n\n**Query:** %s\n\n%s", query, strings.Join(workerOutputs, "\n\n"))
+	if workerOutputSummary != "" {
+		finalOutput = fmt.Sprintf("# Workflow Execution Summary\n\n**Query:** %s\n\n%s", query, workerOutputSummary)
 	} else {
 		finalOutput = fmt.Sprintf("# Workflow Execution Summary\n\n**Query:** %s\n\n**Result:** %s", query, supResp.Content)
 	}
