@@ -28,8 +28,22 @@ export function useWorkflowExecution(
     setActiveNodeId(null);
   }, []);
 
+  const loadSessionData = useCallback(
+    (
+      loadedLogs: SSELogEvent[],
+      output: string | null,
+      initialStatus: 'idle' | 'running' | 'completed' | 'error' = 'completed'
+    ) => {
+      setLogs(loadedLogs);
+      setFinalOutput(output);
+      setStatus(initialStatus);
+      setActiveNodeId(null);
+    },
+    []
+  );
+
   const startExecution = useCallback(
-    (query: string, overrideWorkflowId?: string) => {
+    (query: string, overrideWorkflowId?: string, continueSessionId?: string | null) => {
       const targetId = overrideWorkflowId || workflowId;
       if (!targetId) {
         console.error('Cannot start execution: No workflow ID provided');
@@ -37,15 +51,22 @@ export function useWorkflowExecution(
         return;
       }
 
-      setLogs([]);
-      setFinalOutput(null);
+      // If continuing an existing session, preserve previous logs; otherwise reset
+      if (!continueSessionId) {
+        setLogs([]);
+        setFinalOutput(null);
+        setNodeStatuses({});
+        setEdgeStatuses({});
+      }
       setStatus('running');
-      setNodeStatuses({});
-      setEdgeStatuses({});
       setActiveNodeId(null);
 
       const encodedQuery = encodeURIComponent(query);
-      const url = `${API_BASE}/workflows/${targetId}/execute/stream?query=${encodedQuery}`;
+      let url = `${API_BASE}/workflows/${targetId}/execute/stream?query=${encodedQuery}`;
+      if (continueSessionId) {
+        url += `&session_id=${encodeURIComponent(continueSessionId)}`;
+      }
+
       const eventSource = new EventSource(url);
 
       const handleEvent = (e: MessageEvent) => {
@@ -139,10 +160,6 @@ export function useWorkflowExecution(
         setStatus((prev) => (prev === 'completed' ? 'completed' : 'error'));
         eventSource.close();
       };
-
-      return () => {
-        eventSource.close();
-      };
     },
     [workflowId]
   );
@@ -155,6 +172,7 @@ export function useWorkflowExecution(
     nodeStatuses,
     edgeStatuses,
     clearLogs,
+    loadSessionData,
     startExecution,
   };
 }

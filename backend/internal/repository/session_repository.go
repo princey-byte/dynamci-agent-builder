@@ -128,3 +128,26 @@ func (r *SessionRepository) ListSessions(ctx context.Context) ([]models.Executio
 	}
 	return sessions, nil
 }
+
+func (r *SessionRepository) ListWorkflowSessions(ctx context.Context, workflowID uuid.UUID) ([]models.ExecutionSession, error) {
+	query := `
+		SELECT id, workflow_id, status, input_query, COALESCE(final_output, ''), started_at, completed_at 
+		FROM execution_sessions 
+		WHERE workflow_id = $1 
+		ORDER BY started_at DESC
+	`
+	rows, err := r.pool.Query(ctx, query, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.ExecutionSession
+	for rows.Next() {
+		var s models.ExecutionSession
+		if err := rows.Scan(&s.ID, &s.WorkflowID, &s.Status, &s.InputQuery, &s.FinalOutput, &s.StartedAt, &s.CompletedAt); err == nil {
+			sessions = append(sessions, s)
+		}
+	}
+	return sessions, nil
+}

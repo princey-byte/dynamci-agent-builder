@@ -2,13 +2,14 @@
 
 import { useState, useEffect, use } from 'react';
 import { api } from '../../../../lib/api';
-import { Agent, Workflow, SSELogEvent } from '../../../../lib/types';
+import { Agent, Workflow, SSELogEvent, ExecutionSession } from '../../../../lib/types';
 import { WorkflowBuilder } from '../../../../components/workflows/WorkflowBuilder';
 
 export default function WorkflowStudioPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [sessions, setSessions] = useState<ExecutionSession[]>([]);
   const [initialLogs, setInitialLogs] = useState<SSELogEvent[]>([]);
   const [initialOutput, setInitialOutput] = useState<string | null>(null);
   const [initialQuery, setInitialQuery] = useState<string>('');
@@ -20,16 +21,16 @@ export default function WorkflowStudioPage({ params }: { params: Promise<{ id: s
         const [wfData, agentsData, sessionsData] = await Promise.all([
           api.getWorkflow(resolvedParams.id),
           api.getAgents(),
-          api.getSessions().catch(() => []),
+          api.getWorkflowSessions(resolvedParams.id).catch(() => []),
         ]);
 
         setWorkflow(wfData);
         setAgents(agentsData || []);
+        setSessions(sessionsData || []);
 
-        // Find the most recent session for this workflow
-        const workflowSessions = (sessionsData || []).filter((s) => s.workflow_id === resolvedParams.id);
-        if (workflowSessions.length > 0) {
-          const latest = workflowSessions[0];
+        // Preload the latest session if available
+        if (sessionsData && sessionsData.length > 0) {
+          const latest = sessionsData[0];
           try {
             const fullSession = await api.getSession(latest.id);
             if (fullSession) {
@@ -81,6 +82,7 @@ export default function WorkflowStudioPage({ params }: { params: Promise<{ id: s
     <WorkflowBuilder
       availableAgents={agents}
       initialWorkflow={workflow}
+      initialSessions={sessions}
       initialLogs={initialLogs}
       initialOutput={initialOutput}
       initialQuery={initialQuery}

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { Agent, Workflow, SSELogEvent } from '../../lib/types';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Agent, Workflow, SSELogEvent, ExecutionSession, NodeExecutionStatus, EdgeExecutionStatus } from '../../lib/types';
 import { WorkflowCanvas } from './builder/WorkflowCanvas';
 import { WorkflowTopBar } from './builder/WorkflowTopBar';
 import { AgentPaletteSidebar } from './builder/AgentPaletteSidebar';
@@ -12,11 +12,13 @@ import { SelectedWorker, WorkflowEdgeData } from './builder/types';
 import { useWorkflowGraph } from './builder/useWorkflowGraph';
 import { useWorkflowStudio } from './builder/useWorkflowStudio';
 import { useWorkflowExecution } from '../../hooks/useWorkflowExecution';
+import { api } from '../../lib/api';
 import { Edge } from '@xyflow/react';
 
 interface WorkflowBuilderProps {
   availableAgents: Agent[];
   initialWorkflow?: Workflow;
+  initialSessions?: ExecutionSession[];
   initialLogs?: SSELogEvent[];
   initialOutput?: string | null;
   initialQuery?: string;
@@ -25,6 +27,7 @@ interface WorkflowBuilderProps {
 export function WorkflowBuilder({
   availableAgents,
   initialWorkflow,
+  initialSessions = [],
   initialLogs = [],
   initialOutput = null,
   initialQuery = '',
@@ -46,6 +49,17 @@ export function WorkflowBuilder({
   const [isExecutionDrawerOpen, setIsExecutionDrawerOpen] = useState(Boolean(initialLogs.length > 0 || initialOutput));
   const [testQuery, setTestQuery] = useState(initialQuery);
 
+  // Multi-session execution history state
+  const [sessions, setSessions] = useState<ExecutionSession[]>(initialSessions);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    initialSessions.length > 0 ? initialSessions[0].id : null
+  );
+  const [isNewRunMode, setIsNewRunMode] = useState<boolean>(initialSessions.length === 0);
+
+  // Historical node and edge highlights for selected past run
+  const [historicalNodeStatuses, setHistoricalNodeStatuses] = useState<Record<string, NodeExecutionStatus>>({});
+  const [historicalEdgeStatuses, setHistoricalEdgeStatuses] = useState<Record<string, EdgeExecutionStatus>>({});
+
   // Quick attach child state
   const [quickAttachParentId, setQuickAttachParentId] = useState<string | null>(null);
 
@@ -63,11 +77,110 @@ export function WorkflowBuilder({
     status: executionStatus,
     finalOutput,
     activeNodeId,
-    nodeStatuses,
-    edgeStatuses,
+    nodeStatuses: liveNodeStatuses,
+    edgeStatuses: liveEdgeStatuses,
     clearLogs,
+    loadSessionData,
     startExecution,
   } = useWorkflowExecution(activeWorkflowId || initialWorkflow?.id || '', initialLogs, initialOutput);
+
+  // When live execution is running, use live statuses; otherwise use historical or neutral
+  const activeNodeStatuses = useMemo(() => {
+    if (executionStatus === 'running') return liveNodeStatuses;
+    if (!isNewRunMode && Object.keys(historicalNodeStatuses).length > 0) return historicalNodeStatuses;
+    return liveNodeStatuses;
+  }, [executionStatus, liveNodeStatuses, isNewRunMode, historicalNodeStatuses]);
+
+  const activeEdgeStatuses = useMemo(() => {
+    if (executionStatus === 'running') return liveEdgeStatuses;
+    if (!isNewRunMode && Object.keys(historicalEdgeStatuses).length > 0) return historicalEdgeStatuses;
+    return liveEdgeStatuses;
+  }, [executionStatus, liveEdgeStatuses, isNewRunMode, historicalEdgeStatuses]);
+
+  // Refresh sessions when a live execution completes
+  useEffect(() => {
+    if (executionStatus === 'completed' || executionStatus === 'error') {
+      const targetWfId = activeWorkflowId || initialWorkflow?.id;
+      if (targetWfId) {
+        api.getWorkflowSessions(targetWfId)
+          .then((updatedSessions) => {
+            if (updatedSessions && updatedSessions.length > 0) {
+              setSessions(updatedSessions);
+              setSelectedSessionId(updatedSessions[0].id);
+              setIsNewRunMode(false);
+            }
+          })
+          .catch(console.error);
+      }
+    }
+  }, [executionStatus, activeWorkflowId, initialWorkflow?.id]);
+
+  // Handle switching between past historical runs
+  const handleSelectSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        const fullSession = await api.getSession(sessionId);
+        if (fullSession) {
+          setSelectedSessionId(sessionId);
+          setIsNewRunMode(false);
+          setTestQuery('');
+
+          const nodeStatusMap: Record<string, NodeExecutionStatus> = {};
+          const edgeStatusMap: Record<string, EdgeExecutionStatus> = {};
+          const mappedLogs: SSELogEvent[] = [];
+
+          if (fullSession.logs && fullSession.logs.length > 0) {
+            fullSession.logs.forEach((l) => {
+              const agentKey = l.agent_id || l.agent_name;
+              if (agentKey) {
+                nodeStatusMap[agentKey] = l.log_type === 'BRANCH_SKIPPED' ? 'skipped' : 'completed';
+              }
+
+              let parsedContent: Record<string, unknown> = {};
+              if (l.content) {
+                parsedContent = typeof l.content === 'string' ? JSON.parse(l.content) : (l.content as Record<string, unknown>);
+                if (parsedContent?.edge_id) {
+                  edgeStatusMap[String(parsedContent.edge_id)] = l.log_type === 'BRANCH_SKIPPED' ? 'skipped' : 'traversed';
+                }
+              }
+
+              mappedLogs.push({
+                event: l.log_type as SSELogEvent['event'],
+                session_id: fullSession.id,
+                agent_name: l.agent_name,
+                agent_id: l.agent_id,
+                step: l.step_number,
+                payload: parsedContent,
+              });
+            });
+          }
+
+          // Immediately update reactive logs and output in the execution hook
+          loadSessionData(
+            mappedLogs,
+            fullSession.final_output || null,
+            fullSession.status === 'ERROR' ? 'error' : 'completed'
+          );
+
+          setHistoricalNodeStatuses(nodeStatusMap);
+          setHistoricalEdgeStatuses(edgeStatusMap);
+        }
+      } catch (err) {
+        console.error('Failed to load session details:', err);
+      }
+    },
+    [loadSessionData]
+  );
+
+  // Handle starting a fresh clean test run
+  const handleNewRun = useCallback(() => {
+    setSelectedSessionId(null);
+    setIsNewRunMode(true);
+    setTestQuery('');
+    clearLogs();
+    setHistoricalNodeStatuses({});
+    setHistoricalEdgeStatuses({});
+  }, [clearLogs]);
 
   // Compute real-time action description from streaming logs
   const currentActionText = useMemo(() => {
@@ -149,8 +262,8 @@ export function WorkflowBuilder({
     initialNodes: initialWorkflow?.nodes,
     initialEdges: initialWorkflow?.edges,
     activeNodeId,
-    nodeStatuses,
-    edgeStatuses,
+    nodeStatuses: activeNodeStatuses,
+    edgeStatuses: activeEdgeStatuses,
     currentActionText,
     onRemoveWorker: removeWorkerNode,
     onOpenQuickAttach: (parentId) => setQuickAttachParentId(parentId),
@@ -213,7 +326,9 @@ export function WorkflowBuilder({
 
     // 2. Open drawer and launch execution stream
     setIsExecutionDrawerOpen(true);
-    startExecution(testQuery, targetWfId);
+    const continueSessionId = !isNewRunMode && selectedSessionId ? selectedSessionId : null;
+    startExecution(testQuery, targetWfId, continueSessionId);
+    setTestQuery('');
   };
 
   return (
@@ -284,10 +399,15 @@ export function WorkflowBuilder({
         finalOutput={finalOutput}
         query={testQuery}
         isOpen={isExecutionDrawerOpen}
+        sessions={sessions}
+        selectedSessionId={selectedSessionId}
+        isNewRunMode={isNewRunMode}
         onToggleOpen={() => setIsExecutionDrawerOpen(!isExecutionDrawerOpen)}
         onQueryChange={setTestQuery}
         onRun={handleRunExecution}
-        onClearLogs={clearLogs}
+        onClearLogs={handleNewRun}
+        onSelectSession={handleSelectSession}
+        onNewRun={handleNewRun}
       />
     </div>
   );

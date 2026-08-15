@@ -112,6 +112,7 @@ export const api = {
     }
   ) => fetchJSON<Workflow>(`/workflows/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteWorkflow: (id: string) => fetchJSON<{ message: string }>(`/workflows/${id}`, { method: 'DELETE' }),
+  getWorkflowSessions: (workflowId: string) => fetchJSON<ExecutionSession[]>(`/workflows/${workflowId}/sessions`),
 
   // Sessions
   getSessions: () => fetchJSON<ExecutionSession[]>('/sessions'),

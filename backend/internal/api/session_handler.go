@@ -53,3 +53,18 @@ func (h *SessionHandler) GetSessionLogs(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, logs)
 }
+
+func (h *SessionHandler) ListWorkflowSessions(c *gin.Context) {
+	wfID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workflow ID"})
+		return
+	}
+	sessions, err := h.repo.ListWorkflowSessions(c.Request.Context(), wfID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, sessions)
+}
+

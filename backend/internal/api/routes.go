@@ -84,6 +84,7 @@ func SetupRouter(
 		v1.GET("/workflows/:id", workflowHandler.GetWorkflow)
 		v1.PUT("/workflows/:id", workflowHandler.UpdateWorkflow)
 		v1.DELETE("/workflows/:id", workflowHandler.DeleteWorkflow)
+		v1.GET("/workflows/:id/sessions", sessionHandler.ListWorkflowSessions)
 		v1.GET("/workflows/:id/execute/stream", streamHandler.ExecuteStream)
 
 		// Sessions

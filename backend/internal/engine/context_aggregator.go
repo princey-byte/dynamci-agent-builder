@@ -1,9 +1,11 @@
 package engine
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"agentic-platform/backend/internal/llm"
 	"agentic-platform/backend/internal/models"
 )
 
@@ -41,4 +43,34 @@ func (ca *ContextAggregator) BuildSystemPrompt(agent *models.Agent) string {
 	}
 
 	return builder.String()
+}
+
+func (ca *ContextAggregator) BuildConversationHistory(logs []models.SessionLog) []llm.ChatMessage {
+	var messages []llm.ChatMessage
+
+	for _, l := range logs {
+		if l.LogType == string(models.EventAgentThought) {
+			var m map[string]interface{}
+			if err := json.Unmarshal(l.Content, &m); err == nil {
+				if thought, ok := m["thought"].(string); ok && thought != "" {
+					messages = append(messages, llm.ChatMessage{
+						Role:    "assistant",
+						Content: fmt.Sprintf("[%s]: %s", l.AgentName, thought),
+					})
+				}
+			}
+		} else if l.LogType == string(models.EventWorkflowComplete) {
+			var m map[string]interface{}
+			if err := json.Unmarshal(l.Content, &m); err == nil {
+				if finalOut, ok := m["final_output"].(string); ok && finalOut != "" {
+					messages = append(messages, llm.ChatMessage{
+						Role:    "assistant",
+						Content: fmt.Sprintf("[Workflow Final Response]: %s", finalOut),
+					})
+				}
+			}
+		}
+	}
+
+	return messages
 }

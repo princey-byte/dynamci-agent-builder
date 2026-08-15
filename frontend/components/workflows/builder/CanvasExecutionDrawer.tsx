@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, ChevronUp, ChevronDown, Terminal, Clock, FileText, Trash2, Loader2 } from 'lucide-react';
-import { SSELogEvent } from '../../../lib/types';
+import { Play, ChevronUp, ChevronDown, Terminal, Clock, FileText, Trash2, Loader2, Send } from 'lucide-react';
+import { SSELogEvent, ExecutionSession } from '../../../lib/types';
 import { EventRenderer } from '../../console/EventRenderer';
 import { SSEStatusPill } from '../../console/SSEStatusPill';
 import { OutputMarkdownViewer } from './OutputMarkdownViewer';
 import { SessionReplayScrubber } from '../../sessions/SessionReplayScrubber';
+import { RunHistorySelector } from './RunHistorySelector';
 
 interface CanvasExecutionDrawerProps {
   logs: SSELogEvent[];
@@ -14,10 +15,15 @@ interface CanvasExecutionDrawerProps {
   finalOutput: string | null;
   query: string;
   isOpen: boolean;
+  sessions?: ExecutionSession[];
+  selectedSessionId?: string | null;
+  isNewRunMode?: boolean;
   onToggleOpen: () => void;
   onQueryChange: (q: string) => void;
   onRun: (e: React.FormEvent) => void;
   onClearLogs: () => void;
+  onSelectSession?: (sessionId: string) => void;
+  onNewRun?: () => void;
 }
 
 export function CanvasExecutionDrawer({
@@ -26,14 +32,25 @@ export function CanvasExecutionDrawer({
   finalOutput,
   query,
   isOpen,
+  sessions = [],
+  selectedSessionId = null,
+  isNewRunMode = true,
   onToggleOpen,
   onQueryChange,
   onRun,
   onClearLogs,
+  onSelectSession = () => {},
+  onNewRun = () => {},
 }: CanvasExecutionDrawerProps) {
   const [activeTab, setActiveTab] = useState<'stream' | 'timeline' | 'output'>('stream');
   const [scrubbedStep, setScrubbedStep] = useState<number>(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const totalSessions = sessions.length;
+  const currentSelectedSession = sessions.find((s) => s.id === selectedSessionId);
+  const currentRunNumber = currentSelectedSession
+    ? totalSessions - sessions.findIndex((s) => s.id === selectedSessionId)
+    : totalSessions;
 
   // Auto-switch to output tab upon completion if output exists
   useEffect(() => {
@@ -63,37 +80,60 @@ export function CanvasExecutionDrawer({
       }`}
     >
       {/* Header Dock Bar */}
-      <div className="flex h-14 items-center justify-between px-4 border-b border-border/80">
-        <form onSubmit={onRun} className="flex flex-1 items-center space-x-3 mr-4">
+      <div className="flex h-14 items-center justify-between px-4 border-b border-border/80 gap-3">
+        {/* Run History Selector */}
+        <RunHistorySelector
+          sessions={sessions}
+          selectedSessionId={selectedSessionId}
+          isNewRunMode={isNewRunMode}
+          isRunning={status === 'running'}
+          onSelectSession={onSelectSession}
+          onNewRun={onNewRun}
+        />
+
+        {/* Query Input & Run / Reply Trigger */}
+        <form onSubmit={onRun} className="flex flex-1 items-center space-x-2">
           <input
             type="text"
             required
-            placeholder="Type task query to test run workflow (e.g. Audit security compliance for PR #104)..."
+            placeholder={
+              !isNewRunMode && selectedSessionId
+                ? `Reply / continue conversation in Run #${currentRunNumber}...`
+                : 'Type task query to test run workflow (e.g. Audit security compliance for PR #104)...'
+            }
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             disabled={status === 'running'}
-            className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none shadow-sm"
+            className="flex-1 rounded-xl border border-border bg-background px-4 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none shadow-sm"
           />
           <button
             type="submit"
             disabled={status === 'running' || !query.trim()}
-            className="flex items-center space-x-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50"
+            className="flex items-center space-x-1.5 rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
           >
             {status === 'running' ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : !isNewRunMode && selectedSessionId ? (
+              <Send className="h-3.5 w-3.5" />
             ) : (
               <Play className="h-3.5 w-3.5 fill-current" />
             )}
-            <span>{status === 'running' ? 'Executing...' : 'Run Test'}</span>
+            <span>
+              {status === 'running'
+                ? 'Executing...'
+                : !isNewRunMode && selectedSessionId
+                ? 'Send Reply'
+                : 'Run Test'}
+            </span>
           </button>
         </form>
 
-        <div className="flex items-center space-x-2 border-l border-border pl-4">
+        <div className="flex items-center space-x-2 border-l border-border pl-3">
           <SSEStatusPill status={status} />
           <button
             type="button"
             onClick={onToggleOpen}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
             title={isOpen ? 'Minimize Console' : 'Expand Console'}
           >
             {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
@@ -110,7 +150,7 @@ export function CanvasExecutionDrawer({
               <button
                 type="button"
                 onClick={() => setActiveTab('stream')}
-                className={`flex items-center space-x-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
+                className={`flex items-center space-x-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
                   activeTab === 'stream'
                     ? 'bg-card text-primary shadow-sm border border-border'
                     : 'text-muted-foreground hover:text-foreground'
@@ -123,7 +163,7 @@ export function CanvasExecutionDrawer({
               <button
                 type="button"
                 onClick={() => setActiveTab('timeline')}
-                className={`flex items-center space-x-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
+                className={`flex items-center space-x-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
                   activeTab === 'timeline'
                     ? 'bg-card text-primary shadow-sm border border-border'
                     : 'text-muted-foreground hover:text-foreground'
@@ -136,7 +176,7 @@ export function CanvasExecutionDrawer({
               <button
                 type="button"
                 onClick={() => setActiveTab('output')}
-                className={`flex items-center space-x-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
+                className={`flex items-center space-x-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
                   activeTab === 'output'
                     ? 'bg-card text-primary shadow-sm border border-border'
                     : 'text-muted-foreground hover:text-foreground'
@@ -151,7 +191,7 @@ export function CanvasExecutionDrawer({
               <button
                 type="button"
                 onClick={onClearLogs}
-                className="flex items-center space-x-1 text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+                className="flex items-center space-x-1 text-[11px] text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
               >
                 <Trash2 className="h-3 w-3" />
                 <span>Clear Logs</span>

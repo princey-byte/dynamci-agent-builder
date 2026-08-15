@@ -31,9 +31,11 @@ func (sr *SupervisorRouter) RouteAndExecute(
 	workflow *models.Workflow,
 	query string,
 	sessionID string,
+	priorHistory []llm.ChatMessage,
+	startStep int,
 	eventChan chan<- models.StreamMessage,
 ) (string, error) {
-	stepNum := 0
+	stepNum := startStep
 	supervisor := workflow.SupervisorAgent
 
 	if supervisor == nil {
@@ -74,12 +76,20 @@ func (sr *SupervisorRouter) RouteAndExecute(
 		return "", err
 	}
 
-	// Evaluate supervisor intent
-	supResp, err := provider.Chat(ctx, []llm.ChatMessage{
+	// Prepare multi-turn chat messages
+	chatMessages := []llm.ChatMessage{
 		{Role: "system", Content: fullSystemPrompt},
-		{Role: "user", Content: fmt.Sprintf("Analyze task and prepare subtasks for workers if necessary: %s", query)},
-	}, nil, supervisor.Temperature)
+	}
+	if len(priorHistory) > 0 {
+		chatMessages = append(chatMessages, priorHistory...)
+	}
+	chatMessages = append(chatMessages, llm.ChatMessage{
+		Role:    "user",
+		Content: fmt.Sprintf("Analyze task and prepare subtasks for workers if necessary: %s", query),
+	})
 
+	// Evaluate supervisor intent
+	supResp, err := provider.Chat(ctx, chatMessages, nil, supervisor.Temperature)
 	if err != nil {
 		return "", err
 	}
