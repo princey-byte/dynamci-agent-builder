@@ -132,9 +132,9 @@ export default function WorkflowsPage() {
                 >
                   <Trash2 />
                 </Button>
-                <Button nativeButton={false} size="sm" render={<Link href={`/workflows/${wf.id}/execute`} />}>
+                <Button nativeButton={false} size="sm" render={<Link href={`/workflows/${wf.id}`} />}>
                   <Play className="fill-current" />
-                  <span>Execute Workflow</span>
+                  <span>Open Studio</span>
                 </Button>
               </CardFooter>
             </Card>

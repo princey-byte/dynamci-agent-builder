@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Agent, Workflow } from '../../lib/types';
+import { Agent, Workflow, SSELogEvent } from '../../lib/types';
 import { WorkflowCanvas } from './builder/WorkflowCanvas';
 import { WorkflowTopBar } from './builder/WorkflowTopBar';
 import { AgentPaletteSidebar } from './builder/AgentPaletteSidebar';
@@ -17,9 +17,18 @@ import { Edge } from '@xyflow/react';
 interface WorkflowBuilderProps {
   availableAgents: Agent[];
   initialWorkflow?: Workflow;
+  initialLogs?: SSELogEvent[];
+  initialOutput?: string | null;
+  initialQuery?: string;
 }
 
-export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBuilderProps) {
+export function WorkflowBuilder({
+  availableAgents,
+  initialWorkflow,
+  initialLogs = [],
+  initialOutput = null,
+  initialQuery = '',
+}: WorkflowBuilderProps) {
   const [workflowName, setWorkflowName] = useState(initialWorkflow?.name || '');
   const [description, setDescription] = useState(initialWorkflow?.description || '');
   const [selectedSupervisorID, setSelectedSupervisorID] = useState<string>(
@@ -34,8 +43,8 @@ export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBu
   );
 
   const [savedSuccessMessage, setSavedSuccessMessage] = useState<string | null>(null);
-  const [isExecutionDrawerOpen, setIsExecutionDrawerOpen] = useState(false);
-  const [testQuery, setTestQuery] = useState('');
+  const [isExecutionDrawerOpen, setIsExecutionDrawerOpen] = useState(Boolean(initialLogs.length > 0 || initialOutput));
+  const [testQuery, setTestQuery] = useState(initialQuery);
 
   // Quick attach child state
   const [quickAttachParentId, setQuickAttachParentId] = useState<string | null>(null);
@@ -56,8 +65,9 @@ export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBu
     activeNodeId,
     nodeStatuses,
     edgeStatuses,
+    clearLogs,
     startExecution,
-  } = useWorkflowExecution(activeWorkflowId || '');
+  } = useWorkflowExecution(activeWorkflowId || initialWorkflow?.id || '', initialLogs, initialOutput);
 
   // Compute real-time action description from streaming logs
   const currentActionText = useMemo(() => {
@@ -136,6 +146,7 @@ export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBu
     availableAgents,
     selectedSupervisorID,
     selectedWorkers,
+    initialEdges: initialWorkflow?.edges,
     activeNodeId,
     nodeStatuses,
     edgeStatuses,
@@ -172,7 +183,7 @@ export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBu
         }));
 
         const saved = await saveWorkflowToDB({
-          workflowId: activeWorkflowId,
+          workflowId: activeWorkflowId || initialWorkflow?.id || null,
           workflowName,
           description,
           supervisorId: selectedSupervisorID,
@@ -187,7 +198,7 @@ export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBu
         return null;
       }
     },
-    [workflowName, description, selectedSupervisorID, selectedWorkers, edges, activeWorkflowId, saveWorkflowToDB, supervisors, setStudioError]
+    [workflowName, description, selectedSupervisorID, selectedWorkers, edges, activeWorkflowId, initialWorkflow?.id, saveWorkflowToDB, supervisors, setStudioError]
   );
 
   const handleRunExecution = async (e: React.FormEvent) => {
@@ -196,15 +207,16 @@ export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBu
 
     // 1. Auto-save current canvas topology to PostgreSQL
     const saved = await handleSaveDraft();
-    if (!saved) return;
+    const targetWfId = saved?.id || activeWorkflowId || initialWorkflow?.id;
+    if (!targetWfId) return;
 
     // 2. Open drawer and launch execution stream
     setIsExecutionDrawerOpen(true);
-    startExecution(testQuery);
+    startExecution(testQuery, targetWfId);
   };
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden bg-background text-foreground">
+    <div className="relative w-full h-full min-h-[500px] overflow-hidden bg-background text-foreground">
       <WorkflowTopBar
         workflowName={workflowName}
         description={description}
@@ -274,7 +286,7 @@ export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBu
         onToggleOpen={() => setIsExecutionDrawerOpen(!isExecutionDrawerOpen)}
         onQueryChange={setTestQuery}
         onRun={handleRunExecution}
-        onClearLogs={() => {}}
+        onClearLogs={clearLogs}
       />
     </div>
   );

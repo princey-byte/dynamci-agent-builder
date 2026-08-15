@@ -49,7 +49,7 @@ export function WorkflowCanvas({
   );
 
   return (
-    <section className="absolute inset-0 pt-14.25">
+    <div className="absolute inset-0 w-full h-full pt-14 overflow-hidden bg-background">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -59,7 +59,7 @@ export function WorkflowCanvas({
           type: 'conditionEdge',
         }}
         connectionLineStyle={{
-          stroke: 'var(--primary)',
+          stroke: 'hsl(var(--primary))',
           strokeWidth: 2.5,
         }}
         onNodesChange={onNodesChange}
@@ -73,11 +73,11 @@ export function WorkflowCanvas({
         nodesDraggable
         nodesConnectable
         elementsSelectable
-        className="bg-background"
+        className="w-full h-full bg-background"
       >
         <Background color="var(--border-subtle)" gap={20} size={1} />
-        <Controls className="border-border-subtle! bg-background-surface! shadow-lg" />
+        <Controls className="!border-border-subtle !bg-background-surface shadow-lg" />
       </ReactFlow>
-    </section>
+    </div>
   );
 }

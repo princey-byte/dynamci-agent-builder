@@ -13,7 +13,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from '@xyflow/react';
-import { Agent, NodeExecutionStatus, EdgeExecutionStatus } from '../../../lib/types';
+import { Agent, NodeExecutionStatus, EdgeExecutionStatus, WorkflowEdge } from '../../../lib/types';
 import { SelectedWorker, SupervisorNodeData, WorkerNodeData, WorkflowEdgeData } from './types';
 
 type NodeLayout = Pick<Node, 'position' | 'measured'>;
@@ -23,6 +23,7 @@ interface UseWorkflowGraphArgs {
   availableAgents: Agent[];
   selectedSupervisorID: string;
   selectedWorkers: SelectedWorker[];
+  initialEdges?: WorkflowEdge[];
   activeNodeId?: string | null;
   nodeStatuses?: Record<string, NodeExecutionStatus>;
   edgeStatuses?: Record<string, EdgeExecutionStatus>;
@@ -35,6 +36,7 @@ export function useWorkflowGraph({
   availableAgents,
   selectedSupervisorID,
   selectedWorkers,
+  initialEdges = [],
   activeNodeId,
   nodeStatuses = {},
   edgeStatuses = {},
@@ -43,7 +45,30 @@ export function useWorkflowGraph({
   onOpenQuickAttach,
 }: UseWorkflowGraphArgs) {
   const [nodeLayouts, setNodeLayouts] = useState<NodeLayoutMap>({});
-  const [customEdges, setCustomEdges] = useState<Edge<WorkflowEdgeData>[]>([]);
+
+  // Initialize customEdges from initialEdges if present
+  const [customEdges, setCustomEdges] = useState<Edge<WorkflowEdgeData>[]>(() => {
+    if (!initialEdges || initialEdges.length === 0) return [];
+    return initialEdges.map((e) => {
+      const sourceId =
+        e.source_node_id === selectedSupervisorID
+          ? 'sup-node'
+          : `worker-node-${e.source_node_id}`;
+      const targetId = `worker-node-${e.target_node_id}`;
+      return {
+        id: e.id || `e-${sourceId}-${targetId}`,
+        source: sourceId,
+        target: targetId,
+        type: 'conditionEdge',
+        data: {
+          condition_type: (e.condition_type || 'always') as any,
+          condition_expression: e.condition_expression,
+          label: e.label || e.condition_type || 'Always',
+        },
+      };
+    });
+  });
+
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   const supervisors = useMemo(

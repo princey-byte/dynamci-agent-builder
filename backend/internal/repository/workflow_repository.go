@@ -327,7 +327,31 @@ func (r *WorkflowRepository) Update(ctx context.Context, id uuid.UUID, req model
 }
 
 func (r *WorkflowRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.pool.Exec(ctx, "DELETE FROM workflows WHERE id = $1", id)
-	return err
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Delete session logs for sessions belonging to this workflow
+	_, _ = tx.Exec(ctx, `
+		DELETE FROM session_logs 
+		WHERE session_id IN (SELECT id FROM execution_sessions WHERE workflow_id = $1)
+	`, id)
+
+	// Delete execution sessions for this workflow
+	_, _ = tx.Exec(ctx, `DELETE FROM execution_sessions WHERE workflow_id = $1`, id)
+
+	// Delete workflow edges and nodes
+	_, _ = tx.Exec(ctx, `DELETE FROM workflow_edges WHERE workflow_id = $1`, id)
+	_, _ = tx.Exec(ctx, `DELETE FROM workflow_nodes WHERE workflow_id = $1`, id)
+
+	// Delete workflow
+	_, err = tx.Exec(ctx, `DELETE FROM workflows WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 

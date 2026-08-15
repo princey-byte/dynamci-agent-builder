@@ -4,12 +4,17 @@ import { usePathname } from 'next/navigation';
 
 export function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isFullscreenWorkflowBuilder = pathname === '/workflows/create';
+  // Match /workflows/create, /workflows/[id], /workflows/[id]/edit, but NOT /workflows list or /workflows/[id]/execute
+  const isWorkflowCanvasStudio =
+    pathname === '/workflows/create' ||
+    (pathname.startsWith('/workflows/') &&
+      !pathname.endsWith('/execute') &&
+      pathname !== '/workflows');
 
-  if (isFullscreenWorkflowBuilder) {
+  if (isWorkflowCanvasStudio) {
     return (
-      <div className="min-h-0 flex-1 overflow-hidden bg-background">
-        <div className="h-full min-h-0">{children}</div>
+      <div className="relative flex-1 w-full h-[calc(100vh-56px)] min-h-0 overflow-hidden bg-background">
+        <div className="w-full h-full min-h-0">{children}</div>
       </div>
     );
   }
