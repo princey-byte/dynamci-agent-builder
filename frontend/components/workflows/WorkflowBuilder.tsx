@@ -77,19 +77,19 @@ export function WorkflowBuilder({
 
     switch (latest.event) {
       case 'TOOL_CALL':
-        return `Tool: ${String(payload.tool_name || 'Executing')}`;
+        return `🔧 Tool: ${String(payload.tool_name || 'Executing')}`;
       case 'TOOL_RESULT':
         return `Tool Result Received`;
       case 'AGENT_DELEGATION':
-        return `Delegating to ${String(payload.to_agent || 'Worker')}`;
+        return `Delegating to ${String(payload.agent_name || payload.to_agent || 'Worker')}`;
       case 'AGENT_THOUGHT':
-        return `Thinking...`;
+        return `⚡ Thinking...`;
       case 'CONDITION_EVALUATED':
         return `Condition Matched`;
       case 'BRANCH_SKIPPED':
         return `Branch Skipped`;
       default:
-        return 'Processing...';
+        return 'Executing...';
     }
   }, [executionStatus, logs]);
 
@@ -146,6 +146,7 @@ export function WorkflowBuilder({
     availableAgents,
     selectedSupervisorID,
     selectedWorkers,
+    initialNodes: initialWorkflow?.nodes,
     initialEdges: initialWorkflow?.edges,
     activeNodeId,
     nodeStatuses,

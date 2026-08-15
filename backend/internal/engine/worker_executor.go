@@ -43,7 +43,9 @@ func (we *WorkerExecutor) ExecuteWorker(
 		AgentName: worker.Name,
 		Step:      currentStep,
 		Payload: map[string]interface{}{
-			"thought": fmt.Sprintf("Worker '%s' received task: %s. Analyzing persona and skills context window...", worker.Name, taskDescription),
+			"agent_id":   worker.ID.String(),
+			"agent_name": worker.Name,
+			"thought":    fmt.Sprintf("Worker '%s' received task: %s. Analyzing persona and skills context window...", worker.Name, taskDescription),
 		},
 	}
 	eventChan <- thoughtMsg
@@ -90,8 +92,10 @@ func (we *WorkerExecutor) ExecuteWorker(
 				AgentName: worker.Name,
 				Step:      tStep,
 				Payload: map[string]interface{}{
-					"tool_name": tc.Name,
-					"arguments": tc.Arguments,
+					"agent_id":   worker.ID.String(),
+					"agent_name": worker.Name,
+					"tool_name":  tc.Name,
+					"arguments":  tc.Arguments,
 				},
 			}
 			eventChan <- toolCallMsg
@@ -114,9 +118,11 @@ func (we *WorkerExecutor) ExecuteWorker(
 				AgentName: worker.Name,
 				Step:      rStep,
 				Payload: map[string]interface{}{
-					"tool_name": tc.Name,
-					"result":    toolResult,
-					"error":     execErr,
+					"agent_id":   worker.ID.String(),
+					"agent_name": worker.Name,
+					"tool_name":  tc.Name,
+					"result":     toolResult,
+					"error":      execErr,
 				},
 			}
 			eventChan <- resultMsg

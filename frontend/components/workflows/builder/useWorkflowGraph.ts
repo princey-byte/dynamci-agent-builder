@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   Connection,
   Edge,
@@ -13,7 +13,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from '@xyflow/react';
-import { Agent, NodeExecutionStatus, EdgeExecutionStatus, WorkflowEdge } from '../../../lib/types';
+import { Agent, NodeExecutionStatus, EdgeExecutionStatus, WorkflowEdge, WorkflowNode } from '../../../lib/types';
 import { SelectedWorker, SupervisorNodeData, WorkerNodeData, WorkflowEdgeData } from './types';
 
 type NodeLayout = Pick<Node, 'position' | 'measured'>;
@@ -23,6 +23,7 @@ interface UseWorkflowGraphArgs {
   availableAgents: Agent[];
   selectedSupervisorID: string;
   selectedWorkers: SelectedWorker[];
+  initialNodes?: WorkflowNode[];
   initialEdges?: WorkflowEdge[];
   activeNodeId?: string | null;
   nodeStatuses?: Record<string, NodeExecutionStatus>;
@@ -36,6 +37,7 @@ export function useWorkflowGraph({
   availableAgents,
   selectedSupervisorID,
   selectedWorkers,
+  initialNodes = [],
   initialEdges = [],
   activeNodeId,
   nodeStatuses = {},
@@ -45,16 +47,42 @@ export function useWorkflowGraph({
   onOpenQuickAttach,
 }: UseWorkflowGraphArgs) {
   const [nodeLayouts, setNodeLayouts] = useState<NodeLayoutMap>({});
+  const [customEdges, setCustomEdges] = useState<Edge<WorkflowEdgeData>[]>([]);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
-  // Initialize customEdges from initialEdges if present
-  const [customEdges, setCustomEdges] = useState<Edge<WorkflowEdgeData>[]>(() => {
-    if (!initialEdges || initialEdges.length === 0) return [];
-    return initialEdges.map((e) => {
+  // Map of node.id / agent_id -> agent_id for robust edge wire resolution
+  const nodeToAgentMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (selectedSupervisorID) {
+      map[selectedSupervisorID] = selectedSupervisorID;
+    }
+    selectedWorkers.forEach((w) => {
+      map[w.agent_id] = w.agent_id;
+    });
+    initialNodes.forEach((n) => {
+      map[n.id] = n.agent_id;
+      map[n.agent_id] = n.agent_id;
+    });
+    return map;
+  }, [selectedSupervisorID, selectedWorkers, initialNodes]);
+
+  // Synchronize / restore customEdges when initialEdges or node mapping is loaded
+  useEffect(() => {
+    if (!initialEdges || initialEdges.length === 0) return;
+
+    const mappedEdges: Edge<WorkflowEdgeData>[] = initialEdges.map((e) => {
+      const resolvedSourceAgent = nodeToAgentMap[e.source_node_id] || e.source_node_id;
+      const resolvedTargetAgent = nodeToAgentMap[e.target_node_id] || e.target_node_id;
+
       const sourceId =
-        e.source_node_id === selectedSupervisorID
+        resolvedSourceAgent === selectedSupervisorID ||
+        e.source_node_id === selectedSupervisorID ||
+        e.source_node_id === 'sup-node'
           ? 'sup-node'
-          : `worker-node-${e.source_node_id}`;
-      const targetId = `worker-node-${e.target_node_id}`;
+          : `worker-node-${resolvedSourceAgent}`;
+
+      const targetId = `worker-node-${resolvedTargetAgent}`;
+
       return {
         id: e.id || `e-${sourceId}-${targetId}`,
         source: sourceId,
@@ -67,9 +95,9 @@ export function useWorkflowGraph({
         },
       };
     });
-  });
 
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+    setCustomEdges(mappedEdges);
+  }, [initialEdges, nodeToAgentMap, selectedSupervisorID]);
 
   const supervisors = useMemo(
     () => availableAgents.filter((agent) => agent.role_type === 'supervisor'),
@@ -100,10 +128,13 @@ export function useWorkflowGraph({
       const isSupActive =
         activeNodeId === selectedSupervisorID ||
         activeNodeId === supervisor.id ||
+        activeNodeId === supervisor.name ||
         activeNodeId === 'sup-node';
       const supStatus: NodeExecutionStatus =
         nodeStatuses['sup-node'] ||
         nodeStatuses[selectedSupervisorID] ||
+        nodeStatuses[supervisor.id] ||
+        nodeStatuses[supervisor.name] ||
         (isSupActive ? 'running' : 'idle');
 
       nextNodes.push({
@@ -127,11 +158,14 @@ export function useWorkflowGraph({
       const isWorkerActive =
         activeNodeId === worker.agent_id ||
         activeNodeId === workerAgent.id ||
+        activeNodeId === workerAgent.name ||
         activeNodeId === nodeID;
 
       const workerStatus: NodeExecutionStatus =
         nodeStatuses[nodeID] ||
         nodeStatuses[worker.agent_id] ||
+        nodeStatuses[workerAgent.id] ||
+        nodeStatuses[workerAgent.name] ||
         (isWorkerActive ? 'running' : 'idle');
 
       nextNodes.push({

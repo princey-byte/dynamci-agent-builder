@@ -57,7 +57,7 @@ export function useWorkflowStudio(initialWorkflowId?: string | null) {
           saved = await api.createWorkflow(payload);
           setActiveWorkflowId(saved.id);
           if (typeof window !== 'undefined') {
-            window.history.replaceState(null, '', `/workflows/${saved.id}/edit`);
+            window.history.replaceState(null, '', `/workflows/${saved.id}`);
           }
         }
         return saved;

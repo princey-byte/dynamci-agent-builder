@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"agentic-platform/backend/internal/models"
@@ -137,7 +138,9 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 			    condition_expression = EXCLUDED.condition_expression,
 			    label = EXCLUDED.label
 		`
-		_, _ = r.pool.Exec(ctx, edgeQuery, uuid.New(), wf.ID, sourceID, targetID, condType, edgeReq.ConditionExpression, edgeReq.Label, now)
+		if _, execErr := r.pool.Exec(ctx, edgeQuery, uuid.New(), wf.ID, sourceID, targetID, condType, edgeReq.ConditionExpression, edgeReq.Label, now); execErr != nil {
+			log.Printf("Error inserting workflow edge (workflow %v, %v -> %v): %v", wf.ID, sourceID, targetID, execErr)
+		}
 	}
 
 	return r.GetByID(ctx, wf.ID)
@@ -320,7 +323,9 @@ func (r *WorkflowRepository) Update(ctx context.Context, id uuid.UUID, req model
 			    condition_expression = EXCLUDED.condition_expression,
 			    label = EXCLUDED.label
 		`
-		_, _ = r.pool.Exec(ctx, edgeQuery, uuid.New(), id, sourceID, targetID, condType, edgeReq.ConditionExpression, edgeReq.Label, now)
+		if _, execErr := r.pool.Exec(ctx, edgeQuery, uuid.New(), id, sourceID, targetID, condType, edgeReq.ConditionExpression, edgeReq.Label, now); execErr != nil {
+			log.Printf("Error inserting workflow edge in Update (workflow %v, %v -> %v): %v", id, sourceID, targetID, execErr)
+		}
 	}
 
 	return r.GetByID(ctx, id)

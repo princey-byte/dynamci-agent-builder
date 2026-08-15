@@ -48,7 +48,9 @@ func (sr *SupervisorRouter) RouteAndExecute(
 		AgentName: supervisor.Name,
 		Step:      stepNum,
 		Payload: map[string]interface{}{
-			"thought": fmt.Sprintf("Supervisor '%s' evaluating workflow request: '%s'", supervisor.Name, query),
+			"agent_id":   supervisor.ID.String(),
+			"agent_name": supervisor.Name,
+			"thought":    fmt.Sprintf("Supervisor '%s' evaluating workflow request: '%s'", supervisor.Name, query),
 		},
 	}
 	eventChan <- initMsg
@@ -89,7 +91,9 @@ func (sr *SupervisorRouter) RouteAndExecute(
 		AgentName: supervisor.Name,
 		Step:      stepNum,
 		Payload: map[string]interface{}{
-			"thought": fmt.Sprintf("Supervisor strategy & delegation plan: %s", supResp.Content),
+			"agent_id":   supervisor.ID.String(),
+			"agent_name": supervisor.Name,
+			"thought":    fmt.Sprintf("Supervisor strategy & delegation plan: %s", supResp.Content),
 		},
 	}
 	eventChan <- planMsg
@@ -112,7 +116,9 @@ func (sr *SupervisorRouter) RouteAndExecute(
 		AgentName: supervisor.Name,
 		Step:      stepNum,
 		Payload: map[string]interface{}{
-			"thought": "All worker subtasks completed. Synthesizing final response...",
+			"agent_id":   supervisor.ID.String(),
+			"agent_name": supervisor.Name,
+			"thought":    "All worker subtasks completed. Synthesizing final response...",
 		},
 	}
 	eventChan <- aggThoughtMsg

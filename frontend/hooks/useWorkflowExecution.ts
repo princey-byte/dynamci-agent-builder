@@ -54,28 +54,57 @@ export function useWorkflowExecution(
           setLogs((prev) => [...prev, parsed]);
 
           const payload = parsed.payload as Record<string, unknown>;
+          const targetNodeOrAgentId = String(
+            payload?.agent_id ||
+            payload?.node_id ||
+            parsed.agent_id ||
+            payload?.agent_name ||
+            parsed.agent_name ||
+            ''
+          );
 
           // Track active executing node
-          if (payload?.node_id || payload?.agent_id || parsed.agent_name) {
-            const targetNodeOrAgentId = String(payload?.node_id || payload?.agent_id || '');
-            if (targetNodeOrAgentId) {
-              setActiveNodeId(targetNodeOrAgentId);
-              setNodeStatuses((prev) => ({ ...prev, [targetNodeOrAgentId]: 'running' }));
-            }
+          if (targetNodeOrAgentId && parsed.event !== 'WORKFLOW_COMPLETE' && parsed.event !== 'ERROR') {
+            setActiveNodeId(targetNodeOrAgentId);
+            setNodeStatuses((prev) => {
+              const updated: Record<string, NodeExecutionStatus> = { ...prev };
+              // Mark previously running nodes as completed
+              Object.keys(updated).forEach((k) => {
+                if (updated[k] === 'running') {
+                  updated[k] = 'completed';
+                }
+              });
+              updated[targetNodeOrAgentId] = 'running';
+              if (payload?.agent_id) updated[String(payload.agent_id)] = 'running';
+              if (parsed.agent_name) updated[String(parsed.agent_name)] = 'running';
+              return updated;
+            });
           }
 
           // Track condition evaluation & branch skipping
           if (parsed.event === 'CONDITION_EVALUATED' && payload?.edge_id) {
             const edgeId = String(payload.edge_id);
             setEdgeStatuses((prev) => ({ ...prev, [edgeId]: 'traversed' }));
-          } else if (parsed.event === 'BRANCH_SKIPPED' && payload?.edge_id) {
-            const edgeId = String(payload.edge_id);
-            setEdgeStatuses((prev) => ({ ...prev, [edgeId]: 'skipped' }));
+          } else if (parsed.event === 'BRANCH_SKIPPED') {
+            if (payload?.edge_id) {
+              const edgeId = String(payload.edge_id);
+              setEdgeStatuses((prev) => ({ ...prev, [edgeId]: 'skipped' }));
+            }
+            if (targetNodeOrAgentId) {
+              setNodeStatuses((prev) => ({ ...prev, [targetNodeOrAgentId]: 'skipped' }));
+            }
           }
 
           if (parsed.event === 'WORKFLOW_COMPLETE') {
             setStatus('completed');
             setActiveNodeId(null);
+            setNodeStatuses((prev) => {
+              const completed: Record<string, NodeExecutionStatus> = {};
+              Object.keys(prev).forEach((k) => {
+                completed[k] = prev[k] === 'skipped' ? 'skipped' : 'completed';
+              });
+              return completed;
+            });
             if (payload?.final_output) {
               setFinalOutput(String(payload.final_output));
             }

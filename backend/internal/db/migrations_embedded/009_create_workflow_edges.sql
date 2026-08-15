@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS workflow_edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workflow_id UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-    source_node_id UUID NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE,
-    target_node_id UUID NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE,
+    source_node_id UUID NOT NULL,
+    target_node_id UUID NOT NULL,
     condition_type VARCHAR(50) NOT NULL DEFAULT 'always',
     condition_expression TEXT DEFAULT '',
     label VARCHAR(255) DEFAULT '',
