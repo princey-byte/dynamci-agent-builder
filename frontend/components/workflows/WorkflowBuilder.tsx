@@ -84,7 +84,6 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
     availableAgents,
     selectedSupervisorID,
     selectedWorkers,
-    onAddWorker: addWorkerNode,
     onRemoveWorker: removeWorkerNode,
     onOpenQuickAttach: (parentId) => setQuickAttachParentId(parentId),
   });

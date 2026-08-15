@@ -8,8 +8,8 @@ export function DashboardContent({ children }: { children: React.ReactNode }) {
 
   if (isFullscreenWorkflowBuilder) {
     return (
-      <div className="flex-1 overflow-hidden bg-background">
-        <div className="h-screen min-h-0">{children}</div>
+      <div className="min-h-0 flex-1 overflow-hidden bg-background">
+        <div className="h-full min-h-0">{children}</div>
       </div>
     );
   }

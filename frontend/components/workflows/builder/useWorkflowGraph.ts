@@ -10,21 +10,19 @@ import {
   OnConnect,
   OnEdgesChange,
   OnNodesChange,
-  XYPosition,
   applyEdgeChanges,
-  applyNodeChanges,
   addEdge,
 } from '@xyflow/react';
 import { Agent } from '../../../lib/types';
 import { SelectedWorker, SupervisorNodeData, WorkerNodeData, WorkflowEdgeData } from './types';
 
-type PositionMap = Record<string, XYPosition>;
+type NodeLayout = Pick<Node, 'position' | 'measured'>;
+type NodeLayoutMap = Record<string, Partial<NodeLayout>>;
 
 interface UseWorkflowGraphArgs {
   availableAgents: Agent[];
   selectedSupervisorID: string;
   selectedWorkers: SelectedWorker[];
-  onAddWorker: (agentId: string, parentSourceId?: string) => void;
   onRemoveWorker: (agentId: string) => void;
   onOpenQuickAttach?: (parentSourceId: string) => void;
 }
@@ -33,11 +31,10 @@ export function useWorkflowGraph({
   availableAgents,
   selectedSupervisorID,
   selectedWorkers,
-  onAddWorker,
   onRemoveWorker,
   onOpenQuickAttach,
 }: UseWorkflowGraphArgs) {
-  const [nodePositions, setNodePositions] = useState<PositionMap>({});
+  const [nodeLayouts, setNodeLayouts] = useState<NodeLayoutMap>({});
   const [customEdges, setCustomEdges] = useState<Edge<WorkflowEdgeData>[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
@@ -70,7 +67,8 @@ export function useWorkflowGraph({
       nextNodes.push({
         id: 'sup-node',
         type: 'supervisorNode',
-        position: nodePositions['sup-node'] || { x: 500, y: 60 },
+        position: nodeLayouts['sup-node']?.position || { x: 500, y: 60 },
+        measured: nodeLayouts['sup-node']?.measured,
         data: {
           agent: supervisor,
           onAddChild: onOpenQuickAttach,
@@ -85,10 +83,11 @@ export function useWorkflowGraph({
       nextNodes.push({
         id: nodeID,
         type: 'workerNode',
-        position: nodePositions[nodeID] || {
+        position: nodeLayouts[nodeID]?.position || {
           x: 200 + (index % 3) * 340,
           y: 300 + Math.floor(index / 3) * 240,
         },
+        measured: nodeLayouts[nodeID]?.measured,
         data: {
           agent: workerAgent,
           order: worker.execution_order,
@@ -100,21 +99,32 @@ export function useWorkflowGraph({
     });
 
     return nextNodes;
-  }, [availableAgents, selectedSupervisorID, selectedWorkers, nodePositions, onOpenQuickAttach, onRemoveWorker]);
+  }, [availableAgents, selectedSupervisorID, selectedWorkers, nodeLayouts, onOpenQuickAttach, onRemoveWorker]);
 
   const onNodesChange: OnNodesChange = useCallback((changes: NodeChange[]) => {
-    setNodePositions((currentPositions) => {
+    setNodeLayouts((currentLayouts) => {
       let changed = false;
-      const nextPositions = { ...currentPositions };
+      const nextLayouts = { ...currentLayouts };
 
       for (const change of changes) {
         if (change.type === 'position' && change.position) {
-          nextPositions[change.id] = change.position;
+          nextLayouts[change.id] = {
+            ...nextLayouts[change.id],
+            position: change.position,
+          };
+          changed = true;
+        }
+
+        if (change.type === 'dimensions' && change.dimensions) {
+          nextLayouts[change.id] = {
+            ...nextLayouts[change.id],
+            measured: change.dimensions,
+          };
           changed = true;
         }
       }
 
-      return changed ? nextPositions : currentPositions;
+      return changed ? nextLayouts : currentLayouts;
     });
   }, []);
 
@@ -159,21 +169,27 @@ export function useWorkflowGraph({
   }, []);
 
   const autoLayout = useCallback(() => {
-    const newPositions: PositionMap = {};
-    newPositions['sup-node'] = { x: 500, y: 60 };
+    const newLayouts: NodeLayoutMap = {};
+    newLayouts['sup-node'] = {
+      ...nodeLayouts['sup-node'],
+      position: { x: 500, y: 60 },
+    };
 
     selectedWorkers.forEach((worker, index) => {
       const nodeID = `worker-node-${worker.agent_id}`;
       const col = index % 3;
       const row = Math.floor(index / 3);
-      newPositions[nodeID] = {
-        x: 180 + col * 340,
-        y: 280 + row * 240,
+      newLayouts[nodeID] = {
+        ...nodeLayouts[nodeID],
+        position: {
+          x: 180 + col * 340,
+          y: 280 + row * 240,
+        },
       };
     });
 
-    setNodePositions(newPositions);
-  }, [selectedWorkers]);
+    setNodeLayouts(newLayouts);
+  }, [nodeLayouts, selectedWorkers]);
 
   const addEdgeDirect = useCallback((sourceNodeId: string, targetNodeId: string) => {
     setCustomEdges((eds) => {

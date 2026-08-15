@@ -36,8 +36,7 @@ export function CustomConditionEdge({
         path={edgePath}
         style={{
           strokeWidth: selected ? 3 : 2,
-          stroke: selected ? 'hsl(var(--primary))' : 'hsl(var(--foreground) / 0.35)',
-          transition: 'stroke 0.2s, stroke-width 0.2s',
+          stroke: selected ? 'var(--primary)' : 'color-mix(in oklab, var(--foreground) 35%, transparent)',
         }}
       />
       <EdgeLabelRenderer>
@@ -47,7 +46,7 @@ export function CustomConditionEdge({
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
           }}
-          className={`group flex cursor-pointer items-center space-x-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold shadow-md backdrop-blur transition-all hover:scale-110 ${
+          className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold shadow-md backdrop-blur ${
             selected
               ? 'border-primary bg-primary text-primary-foreground ring-2 ring-primary/30'
               : 'border-border bg-card text-foreground hover:border-primary'
