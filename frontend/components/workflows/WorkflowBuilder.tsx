@@ -1,34 +1,87 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Agent } from '../../lib/types';
-import { api } from '../../lib/api';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Agent, Workflow } from '../../lib/types';
 import { WorkflowCanvas } from './builder/WorkflowCanvas';
 import { WorkflowTopBar } from './builder/WorkflowTopBar';
 import { AgentPaletteSidebar } from './builder/AgentPaletteSidebar';
 import { EdgeConditionDrawer } from './builder/EdgeConditionDrawer';
 import { QuickAttachModal } from './builder/QuickAttachModal';
-import { SelectedWorker } from './builder/types';
+import { CanvasExecutionDrawer } from './builder/CanvasExecutionDrawer';
+import { SelectedWorker, WorkflowEdgeData } from './builder/types';
 import { useWorkflowGraph } from './builder/useWorkflowGraph';
+import { useWorkflowStudio } from './builder/useWorkflowStudio';
+import { useWorkflowExecution } from '../../hooks/useWorkflowExecution';
 import { Edge } from '@xyflow/react';
-import { WorkflowEdgeData } from './builder/types';
 
 interface WorkflowBuilderProps {
   availableAgents: Agent[];
+  initialWorkflow?: Workflow;
 }
 
-export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
-  const router = useRouter();
-  const [workflowName, setWorkflowName] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedSupervisorID, setSelectedSupervisorID] = useState<string>('');
-  const [selectedWorkers, setSelectedWorkers] = useState<SelectedWorker[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function WorkflowBuilder({ availableAgents, initialWorkflow }: WorkflowBuilderProps) {
+  const [workflowName, setWorkflowName] = useState(initialWorkflow?.name || '');
+  const [description, setDescription] = useState(initialWorkflow?.description || '');
+  const [selectedSupervisorID, setSelectedSupervisorID] = useState<string>(
+    initialWorkflow?.supervisor_agent_id || ''
+  );
+  const [selectedWorkers, setSelectedWorkers] = useState<SelectedWorker[]>(
+    initialWorkflow?.nodes?.map((n) => ({
+      agent_id: n.agent_id,
+      execution_order: n.execution_order,
+      routing_condition: n.routing_condition || 'Always execute subtask',
+    })) || []
+  );
+
+  const [savedSuccessMessage, setSavedSuccessMessage] = useState<string | null>(null);
+  const [isExecutionDrawerOpen, setIsExecutionDrawerOpen] = useState(false);
+  const [testQuery, setTestQuery] = useState('');
 
   // Quick attach child state
   const [quickAttachParentId, setQuickAttachParentId] = useState<string | null>(null);
+
+  const {
+    activeWorkflowId,
+    setActiveWorkflowId,
+    isSaving,
+    studioError,
+    setStudioError,
+    saveWorkflowToDB,
+  } = useWorkflowStudio(initialWorkflow?.id);
+
+  const {
+    logs,
+    status: executionStatus,
+    finalOutput,
+    activeNodeId,
+    nodeStatuses,
+    edgeStatuses,
+    startExecution,
+  } = useWorkflowExecution(activeWorkflowId || '');
+
+  // Compute real-time action description from streaming logs
+  const currentActionText = useMemo(() => {
+    if (executionStatus !== 'running' || logs.length === 0) return undefined;
+    const latest = logs[logs.length - 1];
+    const payload = latest.payload as Record<string, unknown>;
+
+    switch (latest.event) {
+      case 'TOOL_CALL':
+        return `Tool: ${String(payload.tool_name || 'Executing')}`;
+      case 'TOOL_RESULT':
+        return `Tool Result Received`;
+      case 'AGENT_DELEGATION':
+        return `Delegating to ${String(payload.to_agent || 'Worker')}`;
+      case 'AGENT_THOUGHT':
+        return `Thinking...`;
+      case 'CONDITION_EVALUATED':
+        return `Condition Matched`;
+      case 'BRANCH_SKIPPED':
+        return `Branch Skipped`;
+      default:
+        return 'Processing...';
+    }
+  }, [executionStatus, logs]);
 
   const addWorkerNode = (agentId: string, parentSourceId?: string) => {
     if (!agentId) return;
@@ -47,7 +100,6 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
       ];
     });
 
-    // If added from a parent node, also create connection edge
     if (parentSourceId) {
       setTimeout(() => {
         addEdgeDirect(parentSourceId, `worker-node-${agentId}`);
@@ -84,6 +136,10 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
     availableAgents,
     selectedSupervisorID,
     selectedWorkers,
+    activeNodeId,
+    nodeStatuses,
+    edgeStatuses,
+    currentActionText,
     onRemoveWorker: removeWorkerNode,
     onOpenQuickAttach: (parentId) => setQuickAttachParentId(parentId),
   });
@@ -92,53 +148,59 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
     setSelectedEdgeId(edge.id);
   };
 
-  const handleSave = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!workflowName.trim()) {
-      setError('Please provide a workflow name.');
-      return;
-    }
-    const selectedSupervisor = supervisors.find((supervisor) => supervisor.id === selectedSupervisorID);
-    if (!selectedSupervisor) {
-      setError('Please select an agent with role_type supervisor as the root coordinator.');
-      return;
-    }
-    const invalidWorker = selectedWorkers.find((worker) => !workers.some((agent) => agent.id === worker.agent_id));
-    if (invalidWorker) {
-      setError('Only agents with role_type worker can be connected as worker nodes.');
-      return;
-    }
+  const handleSaveDraft = useCallback(
+    async (e?: React.FormEvent): Promise<Workflow | null> => {
+      if (e) e.preventDefault();
+      if (!workflowName.trim()) {
+        setStudioError('Please provide a workflow name.');
+        return null;
+      }
+      const selectedSupervisor = supervisors.find((s) => s.id === selectedSupervisorID);
+      if (!selectedSupervisor) {
+        setStudioError('Please select a root supervisor agent.');
+        return null;
+      }
 
-    setSaving(true);
-    setError(null);
+      try {
+        const formattedCustomEdges = edges.map((edge) => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          condition_type: (edge.data?.condition_type || 'always') as any,
+          condition_expression: edge.data?.condition_expression,
+          label: edge.data?.label,
+        }));
 
-    // Format edges for backend API
-    const formattedEdges = edges.map((edge) => {
-      const sourceClean = edge.source.replace('worker-node-', '').replace('sup-node', selectedSupervisorID);
-      const targetClean = edge.target.replace('worker-node-', '');
-      return {
-        source_node_id: sourceClean,
-        target_node_id: targetClean,
-        condition_type: edge.data?.condition_type || 'always',
-        condition_expression: edge.data?.condition_expression || '',
-        label: edge.data?.label || '',
-      };
-    });
+        const saved = await saveWorkflowToDB({
+          workflowId: activeWorkflowId,
+          workflowName,
+          description,
+          supervisorId: selectedSupervisorID,
+          workers: selectedWorkers,
+          edges: formattedCustomEdges,
+        });
 
-    try {
-      await api.createWorkflow({
-        name: workflowName,
-        description,
-        supervisor_agent_id: selectedSupervisorID,
-        nodes: selectedWorkers,
-        edges: formattedEdges,
-      });
-      router.push('/workflows');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save workflow');
-    } finally {
-      setSaving(false);
-    }
+        setSavedSuccessMessage(`Workflow saved successfully.`);
+        setTimeout(() => setSavedSuccessMessage(null), 3000);
+        return saved;
+      } catch (err: unknown) {
+        return null;
+      }
+    },
+    [workflowName, description, selectedSupervisorID, selectedWorkers, edges, activeWorkflowId, saveWorkflowToDB, supervisors, setStudioError]
+  );
+
+  const handleRunExecution = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testQuery.trim() || executionStatus === 'running') return;
+
+    // 1. Auto-save current canvas topology to PostgreSQL
+    const saved = await handleSaveDraft();
+    if (!saved) return;
+
+    // 2. Open drawer and launch execution stream
+    setIsExecutionDrawerOpen(true);
+    startExecution(testQuery);
   };
 
   return (
@@ -146,17 +208,25 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
       <WorkflowTopBar
         workflowName={workflowName}
         description={description}
-        saving={saving}
+        saving={isSaving}
         canSave={Boolean(selectedSupervisorID && workflowName.trim())}
+        executionStatus={executionStatus}
         onWorkflowNameChange={setWorkflowName}
         onDescriptionChange={setDescription}
         onAutoLayout={autoLayout}
-        onSave={handleSave}
+        onSave={handleSaveDraft}
+        onOpenExecutionDrawer={() => setIsExecutionDrawerOpen(true)}
       />
 
-      {error && (
+      {studioError && (
         <div className="absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-xl border border-destructive/30 bg-destructive/10 px-5 py-2.5 text-xs font-semibold text-destructive shadow-2xl backdrop-blur">
-          {error}
+          {studioError}
+        </div>
+      )}
+
+      {savedSuccessMessage && (
+        <div className="absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-xl border border-agent-success/40 bg-agent-success/15 px-5 py-2.5 text-xs font-bold text-agent-success shadow-2xl backdrop-blur animate-fade-in">
+          {savedSuccessMessage}
         </div>
       )}
 
@@ -193,6 +263,18 @@ export function WorkflowBuilder({ availableAgents }: WorkflowBuilderProps) {
         availableWorkers={availableWorkerOptions}
         onClose={() => setQuickAttachParentId(null)}
         onSelectWorker={(agentId, parentId) => addWorkerNode(agentId, parentId)}
+      />
+
+      <CanvasExecutionDrawer
+        logs={logs}
+        status={executionStatus}
+        finalOutput={finalOutput}
+        query={testQuery}
+        isOpen={isExecutionDrawerOpen}
+        onToggleOpen={() => setIsExecutionDrawerOpen(!isExecutionDrawerOpen)}
+        onQueryChange={setTestQuery}
+        onRun={handleRunExecution}
+        onClearLogs={() => {}}
       />
     </div>
   );

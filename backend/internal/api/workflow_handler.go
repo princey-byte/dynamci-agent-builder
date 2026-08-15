@@ -46,6 +46,25 @@ func (h *WorkflowHandler) GetWorkflow(c *gin.Context) {
 	c.JSON(http.StatusOK, wf)
 }
 
+func (h *WorkflowHandler) UpdateWorkflow(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workflow ID"})
+		return
+	}
+	var req models.CreateWorkflowRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	wf, err := h.repo.Update(c.Request.Context(), id, req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, wf)
+}
+
 func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 	workflows, err := h.repo.List(c.Request.Context())
 	if err != nil {

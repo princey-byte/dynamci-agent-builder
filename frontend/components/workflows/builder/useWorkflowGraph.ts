@@ -13,7 +13,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from '@xyflow/react';
-import { Agent } from '../../../lib/types';
+import { Agent, NodeExecutionStatus, EdgeExecutionStatus } from '../../../lib/types';
 import { SelectedWorker, SupervisorNodeData, WorkerNodeData, WorkflowEdgeData } from './types';
 
 type NodeLayout = Pick<Node, 'position' | 'measured'>;
@@ -23,6 +23,10 @@ interface UseWorkflowGraphArgs {
   availableAgents: Agent[];
   selectedSupervisorID: string;
   selectedWorkers: SelectedWorker[];
+  activeNodeId?: string | null;
+  nodeStatuses?: Record<string, NodeExecutionStatus>;
+  edgeStatuses?: Record<string, EdgeExecutionStatus>;
+  currentActionText?: string;
   onRemoveWorker: (agentId: string) => void;
   onOpenQuickAttach?: (parentSourceId: string) => void;
 }
@@ -31,6 +35,10 @@ export function useWorkflowGraph({
   availableAgents,
   selectedSupervisorID,
   selectedWorkers,
+  activeNodeId,
+  nodeStatuses = {},
+  edgeStatuses = {},
+  currentActionText,
   onRemoveWorker,
   onOpenQuickAttach,
 }: UseWorkflowGraphArgs) {
@@ -58,12 +66,21 @@ export function useWorkflowGraph({
     [workers, selectedWorkerIDs]
   );
 
-  // Nodes calculation
+  // Nodes calculation with dynamic live execution states
   const nodes = useMemo<Node<SupervisorNodeData | WorkerNodeData>[]>(() => {
     const supervisor = availableAgents.find((agent) => agent.id === selectedSupervisorID);
     const nextNodes: Node<SupervisorNodeData | WorkerNodeData>[] = [];
 
     if (supervisor) {
+      const isSupActive =
+        activeNodeId === selectedSupervisorID ||
+        activeNodeId === supervisor.id ||
+        activeNodeId === 'sup-node';
+      const supStatus: NodeExecutionStatus =
+        nodeStatuses['sup-node'] ||
+        nodeStatuses[selectedSupervisorID] ||
+        (isSupActive ? 'running' : 'idle');
+
       nextNodes.push({
         id: 'sup-node',
         type: 'supervisorNode',
@@ -71,6 +88,8 @@ export function useWorkflowGraph({
         measured: nodeLayouts['sup-node']?.measured,
         data: {
           agent: supervisor,
+          executionStatus: supStatus,
+          currentActionText: isSupActive ? currentActionText || 'Orchestrating Workflow...' : undefined,
           onAddChild: onOpenQuickAttach,
         },
       });
@@ -80,6 +99,16 @@ export function useWorkflowGraph({
       const workerAgent = availableAgents.find((agent) => agent.id === worker.agent_id);
       if (!workerAgent) return;
       const nodeID = `worker-node-${worker.agent_id}`;
+      const isWorkerActive =
+        activeNodeId === worker.agent_id ||
+        activeNodeId === workerAgent.id ||
+        activeNodeId === nodeID;
+
+      const workerStatus: NodeExecutionStatus =
+        nodeStatuses[nodeID] ||
+        nodeStatuses[worker.agent_id] ||
+        (isWorkerActive ? 'running' : 'idle');
+
       nextNodes.push({
         id: nodeID,
         type: 'workerNode',
@@ -92,6 +121,8 @@ export function useWorkflowGraph({
           agent: workerAgent,
           order: worker.execution_order,
           routing: worker.routing_condition,
+          executionStatus: workerStatus,
+          currentActionText: isWorkerActive ? currentActionText || 'Executing Subtask...' : undefined,
           onAddChild: onOpenQuickAttach,
           onRemove: () => onRemoveWorker(worker.agent_id),
         },
@@ -99,7 +130,33 @@ export function useWorkflowGraph({
     });
 
     return nextNodes;
-  }, [availableAgents, selectedSupervisorID, selectedWorkers, nodeLayouts, onOpenQuickAttach, onRemoveWorker]);
+  }, [
+    availableAgents,
+    selectedSupervisorID,
+    selectedWorkers,
+    nodeLayouts,
+    activeNodeId,
+    nodeStatuses,
+    currentActionText,
+    onOpenQuickAttach,
+    onRemoveWorker,
+  ]);
+
+  // Dynamic edges calculation with traversed/skipped status injection
+  const renderedEdges = useMemo<Edge<WorkflowEdgeData>[]>(() => {
+    return customEdges.map((edge) => {
+      const status: EdgeExecutionStatus = edgeStatuses[edge.id] || 'idle';
+      return {
+        ...edge,
+        animated: status === 'traversed',
+        data: {
+          ...edge.data,
+          condition_type: edge.data?.condition_type || 'always',
+          executionStatus: status,
+        },
+      };
+    });
+  }, [customEdges, edgeStatuses]);
 
   const onNodesChange: OnNodesChange = useCallback((changes: NodeChange[]) => {
     setNodeLayouts((currentLayouts) => {
@@ -224,7 +281,7 @@ export function useWorkflowGraph({
     availableWorkerOptions,
     selectedWorkerIDs,
     nodes,
-    edges: customEdges,
+    edges: renderedEdges,
     selectedEdgeId,
     selectedEdgeData,
     setSelectedEdgeId,

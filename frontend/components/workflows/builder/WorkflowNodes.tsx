@@ -2,13 +2,64 @@
 
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Bot, Cpu, Sparkles, Wrench, Plus, Trash2 } from 'lucide-react';
+import { Bot, Cpu, Sparkles, Wrench, Plus, Trash2, CheckCircle2, Ban } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import { SupervisorNodeData, WorkerNodeData } from './types';
+import { NodeExecutionStatus } from '../../../lib/types';
+
+function NodeStatusIndicator({
+  status,
+  actionText,
+}: {
+  status?: NodeExecutionStatus;
+  actionText?: string;
+}) {
+  if (!status || status === 'idle') return null;
+
+  if (status === 'running') {
+    return (
+      <div className="flex items-center space-x-1.5 rounded-full bg-primary/15 border border-primary/40 px-2.5 py-0.5 text-[10px] font-bold text-primary animate-pulse shadow-sm">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
+        <span>{actionText || 'Executing...'}</span>
+      </div>
+    );
+  }
+
+  if (status === 'completed') {
+    return (
+      <div className="flex items-center space-x-1 rounded-full bg-agent-success/15 border border-agent-success/40 px-2 py-0.5 text-[10px] font-bold text-agent-success shadow-sm">
+        <CheckCircle2 className="h-3 w-3" />
+        <span>Completed</span>
+      </div>
+    );
+  }
+
+  if (status === 'skipped') {
+    return (
+      <div className="flex items-center space-x-1 rounded-full bg-muted/50 border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+        <Ban className="h-3 w-3" />
+        <span>Skipped</span>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 export function SupervisorNode({ data, id }: { data: SupervisorNodeData; id: string }) {
+  const isRunning = data.executionStatus === 'running';
+  const isSkipped = data.executionStatus === 'skipped';
+
   return (
-    <div className="group relative min-w-[290px] max-w-[320px] rounded-2xl border-2 border-primary bg-card p-5 text-card-foreground shadow-2xl shadow-primary/10 transition-all hover:border-primary hover:shadow-primary/20">
+    <div
+      className={`group relative min-w-[290px] max-w-[320px] rounded-2xl border-2 bg-card p-5 text-card-foreground shadow-2xl transition-all ${
+        isRunning
+          ? 'border-primary ring-4 ring-primary/30 ring-offset-4 ring-offset-background shadow-primary/30 animate-pulse'
+          : isSkipped
+          ? 'border-border opacity-50 grayscale'
+          : 'border-primary shadow-primary/10 hover:border-primary hover:shadow-primary/20'
+      }`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
@@ -36,6 +87,13 @@ export function SupervisorNode({ data, id }: { data: SupervisorNodeData; id: str
 
       <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{data.agent.persona || 'Workflow Coordinator'}</p>
 
+      {/* Live Status Pill */}
+      {data.executionStatus && data.executionStatus !== 'idle' && (
+        <div className="mt-2.5">
+          <NodeStatusIndicator status={data.executionStatus} actionText={data.currentActionText} />
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-2.5">
         <Badge variant="supervisor">Supervisor</Badge>
         <Badge variant={data.agent.model_provider as 'openai' | 'azure_openai' | 'anthropic' | 'gemini'}>
@@ -54,8 +112,19 @@ export function SupervisorNode({ data, id }: { data: SupervisorNodeData; id: str
 }
 
 export function WorkerNode({ data, id }: { data: WorkerNodeData; id: string }) {
+  const isRunning = data.executionStatus === 'running';
+  const isSkipped = data.executionStatus === 'skipped';
+
   return (
-    <div className="group relative min-w-[290px] max-w-[320px] rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl transition-all hover:border-primary/60 hover:shadow-2xl">
+    <div
+      className={`group relative min-w-[290px] max-w-[320px] rounded-2xl border bg-card p-5 text-card-foreground shadow-xl transition-all ${
+        isRunning
+          ? 'border-agent-delegation ring-4 ring-agent-delegation/30 ring-offset-4 ring-offset-background shadow-2xl animate-pulse'
+          : isSkipped
+          ? 'border-border opacity-40 grayscale'
+          : 'border-border hover:border-primary/60 hover:shadow-2xl'
+      }`}
+    >
       {/* Input Connection Handle on Top - Unobstructed */}
       <Handle
         type="target"
@@ -99,6 +168,13 @@ export function WorkerNode({ data, id }: { data: WorkerNodeData; id: string }) {
           )}
         </div>
       </div>
+
+      {/* Live Status Pill */}
+      {data.executionStatus && data.executionStatus !== 'idle' && (
+        <div className="mt-2.5">
+          <NodeStatusIndicator status={data.executionStatus} actionText={data.currentActionText} />
+        </div>
+      )}
 
       <div className="mt-3 flex items-center gap-3 border-t border-border pt-2 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1">

@@ -221,7 +221,113 @@ func (r *WorkflowRepository) List(ctx context.Context) ([]models.Workflow, error
 	return workflows, nil
 }
 
+func (r *WorkflowRepository) Update(ctx context.Context, id uuid.UUID, req models.CreateWorkflowRequest) (*models.Workflow, error) {
+	var supervisorID *uuid.UUID
+	if req.SupervisorAgentID != "" {
+		parsed, err := uuid.Parse(req.SupervisorAgentID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid supervisor agent ID: %w", err)
+		}
+		supervisorID = &parsed
+	}
+
+	query := `
+		UPDATE workflows
+		SET name = $1, description = $2, supervisor_agent_id = $3
+		WHERE id = $4
+	`
+	_, err := r.pool.Exec(ctx, query, req.Name, req.Description, supervisorID, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update workflow: %w", err)
+	}
+
+	// Remove existing edges and nodes
+	_, _ = r.pool.Exec(ctx, `DELETE FROM workflow_edges WHERE workflow_id = $1`, id)
+	_, _ = r.pool.Exec(ctx, `DELETE FROM workflow_nodes WHERE workflow_id = $1`, id)
+
+	now := time.Now()
+	nodeIDMap := make(map[string]uuid.UUID)
+
+	// Create nodes
+	for i, nodeReq := range req.Nodes {
+		agentID, parseErr := uuid.Parse(nodeReq.AgentID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid worker agent ID: %w", parseErr)
+		}
+
+		var parentNodeID *uuid.UUID
+		if nodeReq.ParentNodeID != nil && *nodeReq.ParentNodeID != "" {
+			if pID, pErr := uuid.Parse(*nodeReq.ParentNodeID); pErr == nil {
+				parentNodeID = &pID
+			}
+		}
+
+		nodeID := uuid.New()
+		if nodeReq.ID != nil && *nodeReq.ID != "" {
+			if parsedID, pErr := uuid.Parse(*nodeReq.ID); pErr == nil {
+				nodeID = parsedID
+			}
+		}
+
+		execOrder := nodeReq.ExecutionOrder
+		if execOrder <= 0 {
+			execOrder = i + 1
+		}
+
+		nodeQuery := `
+			INSERT INTO workflow_nodes (id, workflow_id, parent_node_id, agent_id, execution_order, routing_condition)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`
+		_, _ = r.pool.Exec(ctx, nodeQuery, nodeID, id, parentNodeID, agentID, execOrder, nodeReq.RoutingCondition)
+
+		nodeIDMap[nodeID.String()] = nodeID
+		nodeIDMap[agentID.String()] = nodeID
+		if nodeReq.ID != nil {
+			nodeIDMap[*nodeReq.ID] = nodeID
+		}
+	}
+
+	// Create edges
+	for _, edgeReq := range req.Edges {
+		sourceID, srcFound := nodeIDMap[edgeReq.SourceNodeID]
+		if !srcFound {
+			if parsed, pErr := uuid.Parse(edgeReq.SourceNodeID); pErr == nil {
+				sourceID = parsed
+			} else {
+				continue
+			}
+		}
+
+		targetID, tgtFound := nodeIDMap[edgeReq.TargetNodeID]
+		if !tgtFound {
+			if parsed, pErr := uuid.Parse(edgeReq.TargetNodeID); pErr == nil {
+				targetID = parsed
+			} else {
+				continue
+			}
+		}
+
+		condType := edgeReq.ConditionType
+		if condType == "" {
+			condType = "always"
+		}
+
+		edgeQuery := `
+			INSERT INTO workflow_edges (id, workflow_id, source_node_id, target_node_id, condition_type, condition_expression, label, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (workflow_id, source_node_id, target_node_id) DO UPDATE
+			SET condition_type = EXCLUDED.condition_type,
+			    condition_expression = EXCLUDED.condition_expression,
+			    label = EXCLUDED.label
+		`
+		_, _ = r.pool.Exec(ctx, edgeQuery, uuid.New(), id, sourceID, targetID, condType, edgeReq.ConditionExpression, edgeReq.Label, now)
+	}
+
+	return r.GetByID(ctx, id)
+}
+
 func (r *WorkflowRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.pool.Exec(ctx, "DELETE FROM workflows WHERE id = $1", id)
 	return err
 }
+

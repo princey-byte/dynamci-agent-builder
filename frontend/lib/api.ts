@@ -101,6 +101,16 @@ export const api = {
     nodes?: Array<{ id?: string; parent_node_id?: string; agent_id: string; execution_order: number; routing_condition?: string }>;
     edges?: Array<{ source_node_id: string; target_node_id: string; condition_type?: string; condition_expression?: string; label?: string }>;
   }) => fetchJSON<Workflow>('/workflows', { method: 'POST', body: JSON.stringify(data) }),
+  updateWorkflow: (
+    id: string,
+    data: {
+      name: string;
+      description?: string;
+      supervisor_agent_id: string;
+      nodes?: Array<{ id?: string; parent_node_id?: string; agent_id: string; execution_order: number; routing_condition?: string }>;
+      edges?: Array<{ source_node_id: string; target_node_id: string; condition_type?: string; condition_expression?: string; label?: string }>;
+    }
+  ) => fetchJSON<Workflow>(`/workflows/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteWorkflow: (id: string) => fetchJSON<{ message: string }>(`/workflows/${id}`, { method: 'DELETE' }),
 
   // Sessions
