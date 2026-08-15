@@ -6,6 +6,7 @@ import { WorkflowEdgeData } from './types';
 import { GitCommit } from 'lucide-react';
 
 export function CustomConditionEdge({
+  id,
   sourceX,
   sourceY,
   targetX,
@@ -31,10 +32,12 @@ export function CustomConditionEdge({
   return (
     <>
       <BaseEdge
+        id={id}
         path={edgePath}
         style={{
-          strokeWidth: selected ? 2.5 : 1.5,
-          stroke: selected ? 'var(--primary)' : 'var(--border-strong)',
+          strokeWidth: selected ? 3 : 2,
+          stroke: selected ? 'hsl(var(--primary))' : 'hsl(var(--foreground) / 0.35)',
+          transition: 'stroke 0.2s, stroke-width 0.2s',
         }}
       />
       <EdgeLabelRenderer>
@@ -44,11 +47,17 @@ export function CustomConditionEdge({
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
           }}
-          className="group flex cursor-pointer items-center space-x-1.5 rounded-full border border-border-subtle bg-background-surface px-3 py-1 text-[11px] font-medium shadow-md transition-all hover:border-primary hover:scale-105"
+          className={`group flex cursor-pointer items-center space-x-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold shadow-md backdrop-blur transition-all hover:scale-110 ${
+            selected
+              ? 'border-primary bg-primary text-primary-foreground ring-2 ring-primary/30'
+              : 'border-border bg-card text-foreground hover:border-primary'
+          }`}
         >
-          <GitCommit className="h-3.5 w-3.5 text-primary" />
-          <span className="text-foreground">{label}</span>
-          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">({conditionType})</span>
+          <GitCommit className={`h-3.5 w-3.5 ${selected ? 'text-primary-foreground' : 'text-primary'}`} />
+          <span className="font-bold">{label}</span>
+          <span className={`text-[9px] uppercase tracking-wider ${selected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+            ({conditionType})
+          </span>
         </div>
       </EdgeLabelRenderer>
     </>

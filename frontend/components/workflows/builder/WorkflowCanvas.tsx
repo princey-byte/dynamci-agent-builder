@@ -55,6 +55,13 @@ export function WorkflowCanvas({
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        defaultEdgeOptions={{
+          type: 'conditionEdge',
+        }}
+        connectionLineStyle={{
+          stroke: 'hsl(var(--primary))',
+          strokeWidth: 2.5,
+        }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

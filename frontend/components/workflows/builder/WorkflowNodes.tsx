@@ -8,7 +8,7 @@ import { SupervisorNodeData, WorkerNodeData } from './types';
 
 export function SupervisorNode({ data, id }: { data: SupervisorNodeData; id: string }) {
   return (
-    <div className="group relative min-w-[280px] max-w-[320px] rounded-2xl border-2 border-primary bg-card p-5 text-card-foreground shadow-2xl shadow-primary/10 transition-all hover:border-primary hover:shadow-primary/20">
+    <div className="group relative min-w-[290px] max-w-[320px] rounded-2xl border-2 border-primary bg-card p-5 text-card-foreground shadow-2xl shadow-primary/10 transition-all hover:border-primary hover:shadow-primary/20">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
@@ -19,47 +19,48 @@ export function SupervisorNode({ data, id }: { data: SupervisorNodeData; id: str
             <h4 className="text-sm font-bold text-foreground truncate max-w-[180px]">{data.agent.name}</h4>
           </div>
         </div>
+
+        {/* Quick Add Child Button located safely inside card header */}
+        {data.onAddChild && (
+          <button
+            type="button"
+            onClick={() => data.onAddChild?.(id)}
+            className="flex items-center space-x-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-bold text-primary transition-all hover:bg-primary hover:text-primary-foreground shadow-sm"
+            title="Attach a downstream child worker"
+          >
+            <Plus className="h-3 w-3" />
+            <span>Child</span>
+          </button>
+        )}
       </div>
 
       <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{data.agent.persona || 'Workflow Coordinator'}</p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border-subtle pt-2.5">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-2.5">
         <Badge variant="supervisor">Supervisor</Badge>
         <Badge variant={data.agent.model_provider as 'openai' | 'azure_openai' | 'anthropic' | 'gemini'}>
           {data.agent.model_name}
         </Badge>
       </div>
 
-      {/* Output Connection Handle */}
+      {/* Connection Output Handle - Unobstructed and clear */}
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!h-4 !w-4 !rounded-full !border-2 !border-background !bg-primary transition-transform hover:scale-150 shadow-md cursor-crosshair"
+        className="!h-4 !w-4 !rounded-full !border-2 !border-background !bg-primary transition-all hover:!scale-150 hover:!ring-4 hover:!ring-primary/40 shadow-lg cursor-crosshair z-20"
       />
-
-      {/* Quick Add Child Button */}
-      {data.onAddChild && (
-        <button
-          type="button"
-          onClick={() => data.onAddChild?.(id)}
-          className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 flex items-center space-x-1 rounded-full border border-primary/40 bg-background-surface px-2.5 py-0.5 text-[10px] font-semibold text-primary shadow-md transition-all opacity-0 group-hover:opacity-100 hover:scale-110 hover:bg-primary hover:text-primary-foreground"
-        >
-          <Plus className="h-3 w-3" />
-          <span>Add Child</span>
-        </button>
-      )}
     </div>
   );
 }
 
 export function WorkerNode({ data, id }: { data: WorkerNodeData; id: string }) {
   return (
-    <div className="group relative min-w-[280px] max-w-[320px] rounded-2xl border border-border-subtle bg-card p-5 text-card-foreground shadow-xl transition-all hover:border-border-strong hover:shadow-2xl">
-      {/* Input Connection Handle */}
+    <div className="group relative min-w-[290px] max-w-[320px] rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl transition-all hover:border-primary/60 hover:shadow-2xl">
+      {/* Input Connection Handle on Top - Unobstructed */}
       <Handle
         type="target"
         position={Position.Top}
-        className="!h-4 !w-4 !rounded-full !border-2 !border-background !bg-muted-foreground transition-transform hover:scale-150 hover:!bg-primary shadow-md cursor-crosshair"
+        className="!h-4 !w-4 !rounded-full !border-2 !border-background !bg-muted-foreground transition-all hover:!scale-150 hover:!bg-primary hover:!ring-4 hover:!ring-primary/40 shadow-lg cursor-crosshair z-20"
       />
 
       <div className="flex items-center justify-between">
@@ -69,23 +70,37 @@ export function WorkerNode({ data, id }: { data: WorkerNodeData; id: string }) {
           </div>
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Worker Node</span>
-            <h4 className="text-sm font-bold text-foreground truncate max-w-[170px]">{data.agent.name}</h4>
+            <h4 className="text-sm font-bold text-foreground truncate max-w-[140px]">{data.agent.name}</h4>
           </div>
         </div>
 
-        {data.onRemove && (
-          <button
-            type="button"
-            onClick={() => data.onRemove?.(data.agent.id)}
-            className="rounded p-1 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
-            title="Remove Worker Node"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex items-center space-x-1.5">
+          {data.onAddChild && (
+            <button
+              type="button"
+              onClick={() => data.onAddChild?.(id)}
+              className="flex items-center space-x-1 rounded-lg border border-border bg-secondary/80 px-2 py-1 text-[10px] font-bold text-foreground transition-all hover:border-primary hover:text-primary hover:bg-primary/10 shadow-sm"
+              title="Attach downstream sub-worker"
+            >
+              <Plus className="h-3 w-3" />
+              <span>Child</span>
+            </button>
+          )}
+
+          {data.onRemove && (
+            <button
+              type="button"
+              onClick={() => data.onRemove?.(data.agent.id)}
+              className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              title="Remove Worker Node"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-3 border-t border-border-subtle pt-2 text-[11px] text-muted-foreground">
+      <div className="mt-3 flex items-center gap-3 border-t border-border pt-2 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1">
           <Wrench className="h-3.5 w-3.5 text-agent-tool" /> {data.agent.mcp_tools?.length || 0} Tools
         </span>
@@ -101,24 +116,12 @@ export function WorkerNode({ data, id }: { data: WorkerNodeData; id: string }) {
         </Badge>
       </div>
 
-      {/* Output Connection Handle */}
+      {/* Output Connection Handle on Bottom - Unobstructed */}
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!h-4 !w-4 !rounded-full !border-2 !border-background !bg-primary transition-transform hover:scale-150 shadow-md cursor-crosshair"
+        className="!h-4 !w-4 !rounded-full !border-2 !border-background !bg-primary transition-all hover:!scale-150 hover:!ring-4 hover:!ring-primary/40 shadow-lg cursor-crosshair z-20"
       />
-
-      {/* Quick Add Child Button */}
-      {data.onAddChild && (
-        <button
-          type="button"
-          onClick={() => data.onAddChild?.(id)}
-          className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 flex items-center space-x-1 rounded-full border border-primary/40 bg-background-surface px-2.5 py-0.5 text-[10px] font-semibold text-primary shadow-md transition-all opacity-0 group-hover:opacity-100 hover:scale-110 hover:bg-primary hover:text-primary-foreground"
-        >
-          <Plus className="h-3 w-3" />
-          <span>Add Child</span>
-        </button>
-      )}
     </div>
   );
 }
