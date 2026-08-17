@@ -31,6 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           attribute="class"
           defaultTheme="system"
           enableSystem
+          themes={["light", "dark", "brand"]}
           disableTransitionOnChange
         >
           <TooltipProvider>{children}</TooltipProvider>
