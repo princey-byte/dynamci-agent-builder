@@ -13,6 +13,8 @@ export interface SelectedWorker {
   agent_id: string;
   execution_order: number;
   routing_condition: string;
+  position_x?: number;
+  position_y?: number;
 }
 
 export interface CustomWorkflowEdge {

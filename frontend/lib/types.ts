@@ -153,6 +153,8 @@ export interface WorkflowNode {
   execution_order: number;
   routing_condition?: string;
   node_type?: string;
+  position_x?: number;
+  position_y?: number;
 }
 
 export interface WorkflowEdge {
@@ -166,12 +168,18 @@ export interface WorkflowEdge {
   created_at?: string;
 }
 
+export interface WorkflowUISchema {
+  positions?: Record<string, { x: number; y: number }>;
+  viewport?: { x: number; y: number; zoom: number };
+}
+
 export interface Workflow {
   id: string;
   name: string;
   description: string;
   supervisor_agent_id?: string;
   supervisor_agent?: Agent;
+  ui_schema?: WorkflowUISchema;
   created_at: string;
   nodes?: WorkflowNode[];
   edges?: WorkflowEdge[];

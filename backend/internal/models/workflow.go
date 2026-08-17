@@ -1,20 +1,22 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type Workflow struct {
-	ID                uuid.UUID      `json:"id"`
-	Name              string         `json:"name"`
-	Description       string         `json:"description"`
-	SupervisorAgentID *uuid.UUID     `json:"supervisor_agent_id,omitempty"`
-	SupervisorAgent   *Agent         `json:"supervisor_agent,omitempty"`
-	CreatedAt         time.Time      `json:"created_at"`
-	Nodes             []WorkflowNode `json:"nodes,omitempty"`
-	Edges             []WorkflowEdge `json:"edges,omitempty"`
+	ID                uuid.UUID       `json:"id"`
+	Name              string          `json:"name"`
+	Description       string          `json:"description"`
+	SupervisorAgentID *uuid.UUID      `json:"supervisor_agent_id,omitempty"`
+	SupervisorAgent   *Agent          `json:"supervisor_agent,omitempty"`
+	UISchema          json.RawMessage `json:"ui_schema,omitempty"`
+	CreatedAt         time.Time       `json:"created_at"`
+	Nodes             []WorkflowNode  `json:"nodes,omitempty"`
+	Edges             []WorkflowEdge  `json:"edges,omitempty"`
 }
 
 type WorkflowNode struct {
@@ -26,6 +28,8 @@ type WorkflowNode struct {
 	ExecutionOrder   int        `json:"execution_order"`
 	RoutingCondition string     `json:"routing_condition,omitempty"`
 	NodeType         string     `json:"node_type,omitempty"` // supervisor | worker | team_lead
+	PositionX        float64    `json:"position_x"`
+	PositionY        float64    `json:"position_y"`
 }
 
 type WorkflowEdge struct {
@@ -48,18 +52,21 @@ type CreateWorkflowEdgeRequest struct {
 }
 
 type CreateWorkflowNodeRequest struct {
-	ID               *string `json:"id,omitempty"`
-	ParentNodeID     *string `json:"parent_node_id,omitempty"`
-	AgentID          string  `json:"agent_id" binding:"required"`
-	ExecutionOrder   int     `json:"execution_order"`
-	RoutingCondition string  `json:"routing_condition,omitempty"`
-	NodeType         string  `json:"node_type,omitempty"`
+	ID               *string  `json:"id,omitempty"`
+	ParentNodeID     *string  `json:"parent_node_id,omitempty"`
+	AgentID          string   `json:"agent_id" binding:"required"`
+	ExecutionOrder   int      `json:"execution_order"`
+	RoutingCondition string   `json:"routing_condition,omitempty"`
+	NodeType         string   `json:"node_type,omitempty"`
+	PositionX        *float64 `json:"position_x,omitempty"`
+	PositionY        *float64 `json:"position_y,omitempty"`
 }
 
 type CreateWorkflowRequest struct {
 	Name              string                      `json:"name" binding:"required"`
 	Description       string                      `json:"description"`
 	SupervisorAgentID string                      `json:"supervisor_agent_id" binding:"required"`
+	UISchema          json.RawMessage             `json:"ui_schema,omitempty"`
 	Nodes             []CreateWorkflowNodeRequest `json:"nodes,omitempty"`
 	Edges             []CreateWorkflowEdgeRequest `json:"edges,omitempty"`
 }

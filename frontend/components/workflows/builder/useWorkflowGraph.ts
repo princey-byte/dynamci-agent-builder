@@ -13,7 +13,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from '@xyflow/react';
-import { Agent, NodeExecutionStatus, EdgeExecutionStatus, WorkflowEdge, WorkflowNode } from '../../../lib/types';
+import { Agent, NodeExecutionStatus, EdgeExecutionStatus, WorkflowEdge, WorkflowNode, WorkflowUISchema } from '../../../lib/types';
 import { SelectedWorker, SupervisorNodeData, WorkerNodeData, WorkflowEdgeData } from './types';
 
 type NodeLayout = Pick<Node, 'position' | 'measured'>;
@@ -25,6 +25,7 @@ interface UseWorkflowGraphArgs {
   selectedWorkers: SelectedWorker[];
   initialNodes?: WorkflowNode[];
   initialEdges?: WorkflowEdge[];
+  initialUISchema?: WorkflowUISchema;
   activeNodeId?: string | null;
   nodeStatuses?: Record<string, NodeExecutionStatus>;
   edgeStatuses?: Record<string, EdgeExecutionStatus>;
@@ -39,6 +40,7 @@ export function useWorkflowGraph({
   selectedWorkers,
   initialNodes = [],
   initialEdges = [],
+  initialUISchema,
   activeNodeId,
   nodeStatuses = {},
   edgeStatuses = {},
@@ -49,6 +51,38 @@ export function useWorkflowGraph({
   const [nodeLayouts, setNodeLayouts] = useState<NodeLayoutMap>({});
   const [customEdges, setCustomEdges] = useState<Edge<WorkflowEdgeData>[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+
+  // Synchronize / restore nodeLayouts when initialUISchema or initialNodes with position coordinates is loaded
+  useEffect(() => {
+    const loadedLayouts: NodeLayoutMap = {};
+
+    if (initialUISchema?.positions) {
+      Object.entries(initialUISchema.positions).forEach(([key, pos]) => {
+        if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+          loadedLayouts[key] = { position: pos };
+        }
+      });
+    }
+
+    if (initialNodes && initialNodes.length > 0) {
+      initialNodes.forEach((n) => {
+        if (
+          typeof n.position_x === 'number' &&
+          typeof n.position_y === 'number' &&
+          (n.position_x !== 0 || n.position_y !== 0)
+        ) {
+          const nodeKey = `worker-node-${n.agent_id}`;
+          if (!loadedLayouts[nodeKey]) {
+            loadedLayouts[nodeKey] = { position: { x: n.position_x, y: n.position_y } };
+          }
+        }
+      });
+    }
+
+    if (Object.keys(loadedLayouts).length > 0) {
+      setNodeLayouts((prev) => ({ ...prev, ...loadedLayouts }));
+    }
+  }, [initialUISchema, initialNodes]);
 
   // Map of node.id / agent_id -> agent_id for robust edge wire resolution
   const nodeToAgentMap = useMemo(() => {
@@ -351,5 +385,6 @@ export function useWorkflowGraph({
     deleteEdge,
     autoLayout,
     addEdgeDirect,
+    nodeLayouts,
   };
 }

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { api } from '../../../lib/api';
 import { SelectedWorker, CustomWorkflowEdge } from './types';
-import { Workflow } from '../../../lib/types';
+import { Workflow, WorkflowUISchema } from '../../../lib/types';
 
 interface SaveWorkflowParams {
   workflowId: string | null;
@@ -12,6 +12,7 @@ interface SaveWorkflowParams {
   supervisorId: string;
   workers: SelectedWorker[];
   edges: CustomWorkflowEdge[];
+  uiSchema?: WorkflowUISchema;
 }
 
 export function useWorkflowStudio(initialWorkflowId?: string | null) {
@@ -27,6 +28,7 @@ export function useWorkflowStudio(initialWorkflowId?: string | null) {
       supervisorId,
       workers,
       edges,
+      uiSchema,
     }: SaveWorkflowParams): Promise<Workflow> => {
       setIsSaving(true);
       setStudioError(null);
@@ -45,6 +47,7 @@ export function useWorkflowStudio(initialWorkflowId?: string | null) {
         name: workflowName.trim() || 'Untitled Workflow',
         description,
         supervisor_agent_id: supervisorId,
+        ui_schema: uiSchema,
         nodes: workers,
         edges: formattedEdges,
       };

@@ -51,13 +51,13 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 	now := time.Now()
 
 	query := `
-		INSERT INTO workflows (id, name, description, supervisor_agent_id, created_at)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, name, description, supervisor_agent_id, created_at
+		INSERT INTO workflows (id, name, description, supervisor_agent_id, ui_schema, created_at)
+		VALUES ($1, $2, $3, $4, COALESCE($5, '{}'::jsonb), $6)
+		RETURNING id, name, description, supervisor_agent_id, ui_schema, created_at
 	`
 	var wf models.Workflow
-	err = r.pool.QueryRow(ctx, query, workflowID, req.Name, req.Description, supervisorID, now).Scan(
-		&wf.ID, &wf.Name, &wf.Description, &wf.SupervisorAgentID, &wf.CreatedAt,
+	err = r.pool.QueryRow(ctx, query, workflowID, req.Name, req.Description, supervisorID, req.UISchema, now).Scan(
+		&wf.ID, &wf.Name, &wf.Description, &wf.SupervisorAgentID, &wf.UISchema, &wf.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create workflow: %w", err)
@@ -92,11 +92,20 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 			execOrder = i + 1
 		}
 
+		posX := 0.0
+		if nodeReq.PositionX != nil {
+			posX = *nodeReq.PositionX
+		}
+		posY := 0.0
+		if nodeReq.PositionY != nil {
+			posY = *nodeReq.PositionY
+		}
+
 		nodeQuery := `
-			INSERT INTO workflow_nodes (id, workflow_id, parent_node_id, agent_id, execution_order, routing_condition)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO workflow_nodes (id, workflow_id, parent_node_id, agent_id, execution_order, routing_condition, position_x, position_y)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`
-		_, _ = r.pool.Exec(ctx, nodeQuery, nodeID, wf.ID, parentNodeID, agentID, execOrder, nodeReq.RoutingCondition)
+		_, _ = r.pool.Exec(ctx, nodeQuery, nodeID, wf.ID, parentNodeID, agentID, execOrder, nodeReq.RoutingCondition, posX, posY)
 
 		nodeIDMap[nodeID.String()] = nodeID
 		nodeIDMap[agentID.String()] = nodeID
@@ -147,9 +156,9 @@ func (r *WorkflowRepository) Create(ctx context.Context, req models.CreateWorkfl
 }
 
 func (r *WorkflowRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Workflow, error) {
-	query := `SELECT id, name, description, supervisor_agent_id, created_at FROM workflows WHERE id = $1`
+	query := `SELECT id, name, description, supervisor_agent_id, COALESCE(ui_schema, '{}'::jsonb), created_at FROM workflows WHERE id = $1`
 	var wf models.Workflow
-	err := r.pool.QueryRow(ctx, query, id).Scan(&wf.ID, &wf.Name, &wf.Description, &wf.SupervisorAgentID, &wf.CreatedAt)
+	err := r.pool.QueryRow(ctx, query, id).Scan(&wf.ID, &wf.Name, &wf.Description, &wf.SupervisorAgentID, &wf.UISchema, &wf.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("workflow not found: %w", err)
 	}
@@ -161,7 +170,7 @@ func (r *WorkflowRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 
 	// Fetch nodes
 	nodesQuery := `
-		SELECT id, workflow_id, parent_node_id, agent_id, execution_order, COALESCE(routing_condition, '')
+		SELECT id, workflow_id, parent_node_id, agent_id, execution_order, COALESCE(routing_condition, ''), COALESCE(position_x, 0), COALESCE(position_y, 0)
 		FROM workflow_nodes WHERE workflow_id = $1 ORDER BY execution_order ASC
 	`
 	rows, err := r.pool.Query(ctx, nodesQuery, id)
@@ -170,7 +179,7 @@ func (r *WorkflowRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 		var nodes []models.WorkflowNode
 		for rows.Next() {
 			var n models.WorkflowNode
-			if scanErr := rows.Scan(&n.ID, &n.WorkflowID, &n.ParentNodeID, &n.AgentID, &n.ExecutionOrder, &n.RoutingCondition); scanErr == nil {
+			if scanErr := rows.Scan(&n.ID, &n.WorkflowID, &n.ParentNodeID, &n.AgentID, &n.ExecutionOrder, &n.RoutingCondition, &n.PositionX, &n.PositionY); scanErr == nil {
 				agent, _ := r.agentRepo.GetByID(ctx, n.AgentID)
 				n.Agent = agent
 				nodes = append(nodes, n)
@@ -201,7 +210,7 @@ func (r *WorkflowRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 }
 
 func (r *WorkflowRepository) List(ctx context.Context) ([]models.Workflow, error) {
-	query := `SELECT id, name, description, supervisor_agent_id, created_at FROM workflows ORDER BY created_at DESC`
+	query := `SELECT id, name, description, supervisor_agent_id, COALESCE(ui_schema, '{}'::jsonb), created_at FROM workflows ORDER BY created_at DESC`
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list workflows: %w", err)
@@ -211,7 +220,7 @@ func (r *WorkflowRepository) List(ctx context.Context) ([]models.Workflow, error
 	var workflows []models.Workflow
 	for rows.Next() {
 		var wf models.Workflow
-		if err := rows.Scan(&wf.ID, &wf.Name, &wf.Description, &wf.SupervisorAgentID, &wf.CreatedAt); err == nil {
+		if err := rows.Scan(&wf.ID, &wf.Name, &wf.Description, &wf.SupervisorAgentID, &wf.UISchema, &wf.CreatedAt); err == nil {
 			full, _ := r.GetByID(ctx, wf.ID)
 			if full != nil {
 				wf.SupervisorAgent = full.SupervisorAgent
@@ -236,10 +245,10 @@ func (r *WorkflowRepository) Update(ctx context.Context, id uuid.UUID, req model
 
 	query := `
 		UPDATE workflows
-		SET name = $1, description = $2, supervisor_agent_id = $3
-		WHERE id = $4
+		SET name = $1, description = $2, supervisor_agent_id = $3, ui_schema = COALESCE($4, '{}'::jsonb)
+		WHERE id = $5
 	`
-	_, err := r.pool.Exec(ctx, query, req.Name, req.Description, supervisorID, id)
+	_, err := r.pool.Exec(ctx, query, req.Name, req.Description, supervisorID, req.UISchema, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update workflow: %w", err)
 	}
@@ -277,11 +286,20 @@ func (r *WorkflowRepository) Update(ctx context.Context, id uuid.UUID, req model
 			execOrder = i + 1
 		}
 
+		posX := 0.0
+		if nodeReq.PositionX != nil {
+			posX = *nodeReq.PositionX
+		}
+		posY := 0.0
+		if nodeReq.PositionY != nil {
+			posY = *nodeReq.PositionY
+		}
+
 		nodeQuery := `
-			INSERT INTO workflow_nodes (id, workflow_id, parent_node_id, agent_id, execution_order, routing_condition)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO workflow_nodes (id, workflow_id, parent_node_id, agent_id, execution_order, routing_condition, position_x, position_y)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`
-		_, _ = r.pool.Exec(ctx, nodeQuery, nodeID, id, parentNodeID, agentID, execOrder, nodeReq.RoutingCondition)
+		_, _ = r.pool.Exec(ctx, nodeQuery, nodeID, id, parentNodeID, agentID, execOrder, nodeReq.RoutingCondition, posX, posY)
 
 		nodeIDMap[nodeID.String()] = nodeID
 		nodeIDMap[agentID.String()] = nodeID

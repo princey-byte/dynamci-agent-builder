@@ -255,12 +255,14 @@ export function WorkflowBuilder({
     deleteEdge,
     autoLayout,
     addEdgeDirect,
+    nodeLayouts,
   } = useWorkflowGraph({
     availableAgents,
     selectedSupervisorID,
     selectedWorkers,
     initialNodes: initialWorkflow?.nodes,
     initialEdges: initialWorkflow?.edges,
+    initialUISchema: initialWorkflow?.ui_schema,
     activeNodeId,
     nodeStatuses: activeNodeStatuses,
     edgeStatuses: activeEdgeStatuses,
@@ -296,13 +298,32 @@ export function WorkflowBuilder({
           label: edge.data?.label,
         }));
 
+        // Capture exact canvas positions for all nodes
+        const positionsMap: Record<string, { x: number; y: number }> = {};
+        nodes.forEach((n) => {
+          positionsMap[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
+        });
+
+        const workersWithPositions = selectedWorkers.map((w) => {
+          const nodeKey = `worker-node-${w.agent_id}`;
+          const pos = positionsMap[nodeKey];
+          return {
+            ...w,
+            position_x: pos ? pos.x : 0,
+            position_y: pos ? pos.y : 0,
+          };
+        });
+
         const saved = await saveWorkflowToDB({
           workflowId: activeWorkflowId || initialWorkflow?.id || null,
           workflowName,
           description,
           supervisorId: selectedSupervisorID,
-          workers: selectedWorkers,
+          workers: workersWithPositions,
           edges: formattedCustomEdges,
+          uiSchema: {
+            positions: positionsMap,
+          },
         });
 
         setSavedSuccessMessage(`Workflow saved successfully.`);
@@ -312,7 +333,7 @@ export function WorkflowBuilder({
         return null;
       }
     },
-    [workflowName, description, selectedSupervisorID, selectedWorkers, edges, activeWorkflowId, initialWorkflow?.id, saveWorkflowToDB, supervisors, setStudioError]
+    [workflowName, description, selectedSupervisorID, selectedWorkers, edges, nodes, activeWorkflowId, initialWorkflow?.id, saveWorkflowToDB, supervisors, setStudioError]
   );
 
   const handleRunExecution = async (e: React.FormEvent) => {

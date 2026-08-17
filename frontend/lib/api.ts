@@ -1,4 +1,4 @@
-import { Agent, Skill, MCPTool, MCPServer, Workflow, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool, OAuthInitRequest, OAuthInitResponse, OAuthCallbackRequest, OAuthTokens, MCPDiscoveryResult, AuthConfig, FileType, JsonValue } from './types';
+import { Agent, Skill, MCPTool, MCPServer, Workflow, WorkflowUISchema, ExecutionSession, SessionLog, DiscoverToolsRequest, DiscoveredTool, OAuthInitRequest, OAuthInitResponse, OAuthCallbackRequest, OAuthTokens, MCPDiscoveryResult, AuthConfig, FileType, JsonValue } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -98,7 +98,8 @@ export const api = {
     name: string;
     description?: string;
     supervisor_agent_id: string;
-    nodes?: Array<{ id?: string; parent_node_id?: string; agent_id: string; execution_order: number; routing_condition?: string }>;
+    ui_schema?: WorkflowUISchema;
+    nodes?: Array<{ id?: string; parent_node_id?: string; agent_id: string; execution_order: number; routing_condition?: string; position_x?: number; position_y?: number }>;
     edges?: Array<{ source_node_id: string; target_node_id: string; condition_type?: string; condition_expression?: string; label?: string }>;
   }) => fetchJSON<Workflow>('/workflows', { method: 'POST', body: JSON.stringify(data) }),
   updateWorkflow: (
@@ -107,7 +108,8 @@ export const api = {
       name: string;
       description?: string;
       supervisor_agent_id: string;
-      nodes?: Array<{ id?: string; parent_node_id?: string; agent_id: string; execution_order: number; routing_condition?: string }>;
+      ui_schema?: WorkflowUISchema;
+      nodes?: Array<{ id?: string; parent_node_id?: string; agent_id: string; execution_order: number; routing_condition?: string; position_x?: number; position_y?: number }>;
       edges?: Array<{ source_node_id: string; target_node_id: string; condition_type?: string; condition_expression?: string; label?: string }>;
     }
   ) => fetchJSON<Workflow>(`/workflows/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
