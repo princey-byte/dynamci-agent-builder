@@ -59,7 +59,7 @@ export function WorkflowCanvas({
           type: 'conditionEdge',
         }}
         connectionLineStyle={{
-          stroke: 'hsl(var(--primary))',
+          stroke: 'var(--primary)',
           strokeWidth: 2.5,
         }}
         onNodesChange={onNodesChange}
@@ -76,7 +76,7 @@ export function WorkflowCanvas({
         className="w-full h-full bg-background"
       >
         <Background color="var(--border-subtle)" gap={20} size={1} />
-        <Controls className="!border-border-subtle !bg-background-surface shadow-lg" />
+        <Controls className="border-border-subtle! bg-background-surface! shadow-lg" />
       </ReactFlow>
     </div>
   );

@@ -31,6 +31,7 @@ export function CustomConditionEdge({
   const label = edgeData?.label || conditionType;
   const isTraversed = edgeData?.executionStatus === 'traversed';
   const isSkipped = edgeData?.executionStatus === 'skipped';
+  const skippedStroke = 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)';
 
   return (
     <>
@@ -40,11 +41,11 @@ export function CustomConditionEdge({
         style={{
           strokeWidth: isTraversed ? 3 : selected ? 2.5 : 2,
           stroke: isTraversed
-            ? 'hsl(var(--primary))'
+            ? 'var(--primary)'
             : isSkipped
-            ? 'hsl(var(--muted-foreground) / 0.3)'
+            ? skippedStroke
             : selected
-            ? 'hsl(var(--primary))'
+            ? 'var(--primary)'
             : '#64748b',
           strokeDasharray: isSkipped ? '4 4' : undefined,
           ...style,
